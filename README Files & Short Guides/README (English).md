@@ -1,0 +1,102 @@
+# File Converter Pro (FCP)
+
+File Converter Pro is a Windows desktop application for converting image, video, audio and PDF files locally. Files are not uploaded to an online service.
+
+## Creator
+
+**Author:** B&B Coder  
+**Project:** FCP (File Converter Pro)
+
+## Features
+
+- Convert images to JPG, PNG, WEBP, HEIC, AVIF, PDF, ICO and SVG
+- Convert video to MP4, WEBM, WMV and MKV
+- Convert audio to MP3, WAV, FLAC and OGG
+- Extract text from PDF files
+- Combine multiple images into one PDF
+- Process files and folders in batches
+- Change output resolution
+- Download results as a ZIP archive
+- Protect ZIP archives with AES-256 encryption
+- Multilingual interface and first-run guide
+- Light and dark themes
+- Borderless fullscreen with `F11`
+- Dedicated-GPU detection and native FFmpeg in Electron
+
+## Installation
+
+1. Open the `release` folder.
+2. Run `File Converter Pro Setup 0.0.3.exe`.
+3. Follow the Windows installation steps.
+4. Launch the app from the Start menu or shortcut.
+
+Use the complete `.exe` installer. A `.blockmap` file and a `.__uninstaller.exe` file are not installers.
+After installation, Windows creates a desktop shortcut. The app starts automatically in borderless fullscreen mode. The installed files are stored locally in `%LOCALAPPDATA%\Programs\bestandsconverter`.
+
+## Using the app
+
+1. Add files with `Browse Files` or a folder with `Browse Folder`.
+2. You can also drag files into the window.
+3. Select an output format and, if needed, a resolution for each file.
+4. Use bulk actions when processing multiple files.
+5. Select `Convert All`.
+6. Download results individually or as a ZIP archive.
+
+For the best result, use a valid source file, a suitable output format and an appropriate resolution. Large media files may take longer to process.
+
+## GPU acceleration
+
+The app checks the installed video adapter at startup. If only an integrated GPU is detected, Electron hardware acceleration is disabled. With a dedicated GPU, it remains enabled. NVIDIA GPUs can use `h264_nvenc` and AMD GPUs can use `h264_amf` for supported video output. Audio is processed natively through FFmpeg.
+
+## Shortcuts
+
+- `F11`: toggle fullscreen
+
+The Electron menu bar is hidden. The app starts in borderless fullscreen mode.
+
+## First run
+
+On the first launch, the user chooses a language. A short guide then appears in that language. The selection is stored locally and the guide is not shown again.
+
+## Development
+
+Requirements: Windows 10 or later, Node.js 18 or later and npm.
+
+```powershell
+npm install
+npm rebuild ffmpeg-static --foreground-scripts
+npm run dev
+```
+
+Other commands:
+
+```powershell
+npm run lint
+npm run build
+npm run dist
+```
+
+The installer is created at `release/File Converter Pro Setup <version>.exe`.
+
+## Libraries
+
+- React and React DOM: user interface
+- TypeScript and Vite: development and builds
+- Electron: desktop runtime
+- electron-builder: Windows installer
+- FFmpeg and `ffmpeg-static`: video and audio conversion
+- PDF.js and jsPDF: reading and creating PDFs
+- libheif-js: HEIC/AVIF support
+- ImageTracerJS: SVG conversion
+- zip.js: ZIP archives and AES-256 encryption
+- Tailwind CSS, PostCSS and Autoprefixer: styling
+- `concurrently`: starts Vite and Electron together
+
+## Technology and privacy
+
+The renderer uses `contextIsolation: true` and `nodeIntegration: false`. Native functionality is exposed through the limited preload IPC API. Conversion is performed locally. Internet access is only required for the initial npm installation.
+
+## Credits
+
+**Creator / Author:** B&B Coder  
+**Project:** File Converter Pro (FCP)
