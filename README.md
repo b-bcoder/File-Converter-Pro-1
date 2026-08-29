@@ -61,7 +61,7 @@ npm run dist
 
 6. The setup executable that is installed, will be in the "releases" folder under the name **File Converter Pro Setup <ver.nr.>**.
 
-> Note: The executable must be executed to complete the installation. After installation, you'll find the app on your desktop.
+> Note: The executable must be executed to complete the installation. After installation, you'll find the app on your desktop and in the **"Installed Apps"** in the Windows settings
 
 ## Usage
 
