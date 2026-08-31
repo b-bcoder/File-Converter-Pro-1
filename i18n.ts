@@ -14,6 +14,9 @@ export const translations = {
   svg_engine: {
     en: "SVG Engine", nl: "SVG-engine", tr: "SVG Motoru", zh: "SVG 引擎", ja: "SVGエンジン", fr: "Moteur SVG", de: "SVG-Engine",
   },
+  wallpaper_notice: {
+    en: "For the best result, use a background image with the same aspect ratio as your screen. Otherwise, the image may be stretched.", nl: "Gebruik voor het beste resultaat een achtergrondafbeelding met dezelfde beeldverhouding als uw scherm. Anders kan de afbeelding uitrekken.", tr: "En iyi sonuç için ekranınızla aynı en-boy oranına sahip bir arka plan resmi kullanın. Aksi halde görüntü esneyebilir.", zh: "为获得最佳效果，请使用与屏幕宽高比相同的背景图片，否则图片可能会被拉伸。", ja: "最適な結果を得るには、画面と同じアスペクト比の背景画像を使用してください。それ以外の場合、画像が引き伸ばされることがあります。", fr: "Pour un meilleur résultat, utilisez une image d’arrière-plan avec le même rapport d’aspect que votre écran. Sinon, l’image risque d’être étirée.", de: "Für ein optimales Ergebnis sollte das Hintergrundbild dasselbe Seitenverhältnis wie Ihr Bildschirm haben. Andernfalls kann das Bild gestreckt werden.",
+  },
   drop_files_here: {
     en: "Drag & drop your files or folders here", nl: "Sleep uw bestanden of mappen hierheen", tr: "Dosyalarınızı veya klasörlerinizi buraya sürükleyip bırakın", zh: "将您的文件或文件夹拖放到此处", ja: "ファイルまたはフォルダーをここにドラッグ＆ドロップしてください", fr: "Glissez-déposez vos fichiers ou dossiers ici", de: "Ziehen Sie Ihre Dateien oder Ordner hierher",
   },
@@ -74,6 +77,9 @@ export const translations = {
   media_warning_text: {
     en: "Media conversion is a demanding process and may significantly slow down your computer. The conversion time depends on the length and quality of the media.", nl: "Mediaconversie is een zwaar proces en kan uw computer aanzienlijk vertragen. De conversietijd is afhankelijk van de lengte en kwaliteit van de media.", tr: "Medya dönüştürme zorlu bir işlemdir ve bilgisayarınızı önemli ölçüde yavaşlatabilir. Dönüşüm süresi medyanın uzunluğuna ve kalitesine bağlıdır.", zh: "媒体转换是一个要求很高的过程，可能会显著减慢您的计算机。转换时间取决于媒体的长度和质量。", ja: "メディア変換は要求の厳しいプロセスであり、コンピューターの動作が大幅に遅くなる可能性があります。変換時間はメディアの長さと品質によって異なります。", fr: "La conversion de médias est un processus exigeant et peut ralentir considérablement votre ordinateur. Le temps de conversion dépend de la longueur et de la qualité du média.", de: "Die Medienkonvertierung ist ein anspruchsvoller Prozess und kann Ihren Computer erheblich verlangsamen. Die Konvertierungszeit hängt von der Länge und Qualität der Medien ab.",
   },
+  gpu_detected: {
+    en: "Dedicated GPU detected", nl: "Dedicated GPU gedetecteerd", tr: "Ayrı GPU algılandı", zh: "检测到独显", ja: "専用GPUを検出しました", fr: "GPU dédié détecté", de: "Dedizierte GPU erkannt",
+  },
   add_more_files_prompt: {
     en: "Drag & drop more files or folders. Click to", nl: "Sleep meer bestanden of mappen. Klik om", tr: "Daha fazla dosya veya klasör sürükleyip bırakın. Tıklayın", zh: "拖放更多文件或文件夹。点击以", ja: "さらにファイルやフォルダーをドラッグ＆ドロップします。クリックして", fr: "Glissez-déposez plus de fichiers ou de dossiers. Cliquez pour", de: "Weitere Dateien oder Ordner per Drag & Drop hinzufügen. Klicken Sie, um",
   },
@@ -103,6 +109,9 @@ export const translations = {
   },
   cancel: {
     en: "Cancel", nl: "Annuleren", tr: "İptal", zh: "取消", ja: "キャンセル", fr: "Annuler", de: "Abbrechen",
+  },
+  cancel_conversion: {
+    en: "Cancel conversion", nl: "Annuleer conversie", tr: "Dönüşümü iptal et", zh: "取消转换", ja: "変換をキャンセル", fr: "Annuler la conversion", de: "Konvertierung abbrechen",
   },
   confirm_download: {
     en: "Confirm & Download", nl: "Bevestig & Download", tr: "Onayla ve İndir", zh: "确认并下载", ja: "確認してダウンロード", fr: "Confirmer et télécharger", de: "Bestätigen & Herunterladen",

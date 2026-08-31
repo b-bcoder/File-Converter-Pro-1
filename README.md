@@ -4,7 +4,7 @@ File Converter Pro is a Windows desktop application for converting image, video,
 
 ## Overview
 
-FCP is designed for fast local file conversion with support for batch processing, file and folder conversion, deletion of original files after conversion, and output packaging in ZIP archives.
+FCP is designed for fast local file conversion with support for batch processing, file and folder conversion, and output packaging in ZIP archives.
 
 It is built with Electron, React, Vite and FFmpeg, allowing it to handle a wide range of media conversion tasks without requiring a cloud backend.
 
@@ -59,9 +59,7 @@ npm run dev
 npm run dist
 ```
 
-6. The setup executable that is installed, will be in the "releases" folder under the name **File Converter Pro Setup <ver.nr.>**.
-
-> Note: The executable must be executed to complete the installation. After installation, you'll find the app on your desktop and in the **"Installed Apps"** in the Windows settings
+> Note: the generated installer is large and is intended for local use or distribution outside GitHub, not for uploading to GitHub because of the file size limit.
 
 ## Usage
 
@@ -105,7 +103,8 @@ npm run dist
 │   ├── Short Guide (中文).md
 │   └── Short Guide (日本語).md
 └── assets/
-```
+    └── icon.ico
+
 
 ## Documentation
 

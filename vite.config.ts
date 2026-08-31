@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       optimizeDeps: {
-        include: ['@ffmpeg/util', 'imagetracerjs', '@zip.js/zip.js', 'jspdf', 'libheif-js'],
+        include: ['@ffmpeg/util', 'imagetracerjs', '@zip.js/zip.js', 'jspdf'],
         exclude: ['@ffmpeg/ffmpeg', 'pdfjs-dist']
       },
       build: {

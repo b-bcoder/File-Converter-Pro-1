@@ -20,6 +20,7 @@ export enum ConversionTarget {
   OGG = 'OGG',
   // Document formats
   TXT = 'TXT',
+  SRT = 'SRT',
 }
 
 export type FileStatus = 'pending' | 'reading' | 'converting' | 'success' | 'error';

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { ConversionTarget, FileStatus, ConversionFile } from './types';
-import { convertImage, convertMedia, convertPdfToText } from './services/fileConverter';
+import { convertAudioToText, convertImage, convertMedia, convertPdfToText } from './services/fileConverter';
 import { resolutions } from './resolutions';
 import { t } from './i18n';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -258,10 +258,21 @@ const App: React.FC = () => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'en');
+  const [uiTransparency, setUiTransparency] = useState(() => {
+    const savedValue = Number(localStorage.getItem('ui-transparency'));
+    if (!Number.isFinite(savedValue)) return 0.9;
+    return Math.min(1, Math.max(0.55, savedValue));
+  });
+  const [currentView, setCurrentView] = useState<'home' | 'settings'>('home');
+  const [wallpaper, setWallpaper] = useState<{ enabled: boolean; path: string | null; dataUrl: string | null }>({ enabled: false, path: null, dataUrl: null });
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('onboarding-complete') !== 'true');
   const [combineToPdf, setCombineToPdf] = useState(false);
+  const [gpuToast, setGpuToast] = useState<string | null>(null);
+  const [isStalled, setIsStalled] = useState(false);
   const ffmpegRef = useRef<any>(null);
   const ffmpegLoadingRef = useRef<boolean>(false);
+  const lastProgressAtRef = useRef<number>(Date.now());
+  const MAX_CONCURRENT_CONVERSIONS = 4;
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -283,8 +294,68 @@ const App: React.FC = () => {
     localStorage.setItem('language', language);
   }, [language]);
 
+  useEffect(() => {
+    localStorage.setItem('ui-transparency', String(uiTransparency));
+  }, [uiTransparency]);
+
+  useEffect(() => {
+    (window as any).electronAPI?.getWallpaper?.().then(setWallpaper).catch((error: unknown) => console.error('Failed to load wallpaper', error));
+  }, []);
+
+  useEffect(() => {
+    if (!isConverting) {
+      setIsStalled(false);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setIsStalled(Date.now() - lastProgressAtRef.current > 60000);
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [isConverting]);
+
+  useEffect(() => {
+    if (showOnboarding) return;
+
+    let isMounted = true;
+    const loadGpuInfo = async () => {
+      try {
+        const api = (window as any).electronAPI;
+        if (!api?.getGpuInfo) return;
+        const info = await api.getGpuInfo();
+        if (!isMounted || !info?.hasDedicatedGpu) return;
+        setGpuToast(info.name || 'Dedicated GPU');
+      } catch (error) {
+        console.error('Failed to load GPU info', error);
+      }
+    };
+
+    loadGpuInfo();
+    return () => {
+      isMounted = false;
+    };
+  }, [showOnboarding]);
+
+  useEffect(() => {
+    if (!gpuToast) return;
+
+    const timer = window.setTimeout(() => setGpuToast(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [gpuToast]);
+
   const toggleTheme = () => {
     setTheme(prevTheme => prevTheme === 'dark' ? 'light' : 'dark');
+  };
+
+  const chooseWallpaper = async () => {
+    const nextWallpaper = await (window as any).electronAPI.chooseWallpaper();
+    setWallpaper(nextWallpaper);
+  };
+
+  const disableWallpaper = async () => {
+    const nextWallpaper = await (window as any).electronAPI.disableWallpaper();
+    setWallpaper(nextWallpaper);
   };
 
   // Preload Everything on mount (Desktop App Mode)
@@ -308,13 +379,16 @@ const App: React.FC = () => {
     // Start loading immediately
     loadFfmpeg();
 
-    setIsHeifReady(true);
     setIsPdfReady(true);
     setIsSvgReady(true);
 
     return () => {
     };
   }, []);
+
+  useEffect(() => {
+    setIsHeifReady(isFfmpegReady);
+  }, [isFfmpegReady]);
 
   const hasVideoInQueue = useMemo(() => files.some(f => {
       const { isVideo } = getMediaType(f.file);
@@ -337,6 +411,7 @@ const App: React.FC = () => {
   }), [files]);
   
   const updateFileState = useCallback((id: string, newProps: Partial<ConversionFile>) => {
+    lastProgressAtRef.current = Date.now();
     setFiles(prevFiles =>
       prevFiles.map(f => (f.id === id ? { ...f, ...newProps } : f))
     );
@@ -389,10 +464,27 @@ const App: React.FC = () => {
     setFiles(prev => prev.filter(f => f.id !== id));
   }, []);
   
+  const handleCancelConversion = useCallback(() => {
+    if (!isConverting) return;
+
+    setFiles(prevFiles => prevFiles.map(file => (
+      file.status === 'reading' || file.status === 'converting'
+        ? { ...file, status: 'error', error: 'Conversion cancelled by the user.' }
+        : file
+    )));
+
+    (window as any).electronAPI?.cancelConversion?.().catch(() => undefined);
+    setIsConverting(false);
+    setIsStalled(false);
+    lastProgressAtRef.current = Date.now();
+  }, [isConverting]);
+
   const handleConvertAll = async () => {
     if (isConverting) return;
     setIsConverting(true);
     setConvertedCount(0);
+    setIsStalled(false);
+    lastProgressAtRef.current = Date.now();
   
     // Special handling for combining images into a single PDF
     const pdfImageFiles = files.filter(f => {
@@ -463,54 +555,81 @@ const App: React.FC = () => {
       }
     }
   
-    for (const fileItem of filesToConvert) {
+    let completedCount = currentConverted;
+    const queue = [...filesToConvert];
+
+    const convertSingleFile = async (fileItem: ConversionFile) => {
       updateFileState(fileItem.id, { status: 'reading', readProgress: 0, progress: 0, error: null });
-  
+
       const { id, file, targetFormat, targetDimensions } = fileItem;
       const { isImage, isVideo, isAudio, isPdf } = getMediaType(file);
-  
+
       try {
         let convertedBlob: Blob;
-        if (isImage && [ConversionTarget.JPG, ConversionTarget.PNG, ConversionTarget.WEBP, ConversionTarget.HEIC, ConversionTarget.AVIF, ConversionTarget.PDF, ConversionTarget.ICO, ConversionTarget.SVG].includes(targetFormat as any)) {
+        const isHeifOrAvifSource = /\.(heic|heif|avif)$/i.test(file.name);
+        const needsNativeImageConversion = targetFormat === ConversionTarget.HEIC || targetFormat === ConversionTarget.AVIF || isHeifOrAvifSource;
+
+        if (isImage && needsNativeImageConversion && [ConversionTarget.JPG, ConversionTarget.PNG, ConversionTarget.WEBP, ConversionTarget.HEIC, ConversionTarget.AVIF].includes(targetFormat as any)) {
+          convertedBlob = await convertMedia(ffmpegRef.current, file, targetFormat as any,
+            p => updateFileState(id, { progress: p }),
+            p => updateFileState(id, { readProgress: p }),
+            targetDimensions
+          );
+          updateFileState(id, { status: 'converting' });
+        } else if (isImage && [ConversionTarget.JPG, ConversionTarget.PNG, ConversionTarget.WEBP, ConversionTarget.HEIC, ConversionTarget.AVIF, ConversionTarget.PDF, ConversionTarget.ICO, ConversionTarget.SVG].includes(targetFormat as any)) {
           if (targetFormat === ConversionTarget.SVG) {
-                if (!isSvgReady) setIsSvgReady(true);
+            if (!isSvgReady) setIsSvgReady(true);
           }
           convertedBlob = await convertImage(file, targetFormat as any, p => updateFileState(id, { readProgress: p }), targetDimensions);
           updateFileState(id, { status: 'converting' });
         } else if ((isVideo || isAudio) && [ConversionTarget.MP4, ConversionTarget.WEBM, ConversionTarget.WMV, ConversionTarget.MKV, ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG].includes(targetFormat as any)) {
-          // Double check FFmpeg loaded
           if (!ffmpegRef.current) {
-               throw new Error("Media Engine not loaded yet.");
+            throw new Error('Media Engine not loaded yet.');
           }
-          convertedBlob = await convertMedia(ffmpegRef.current, file, targetFormat as any, 
-            p => updateFileState(id, { progress: p }), 
+          convertedBlob = await convertMedia(ffmpegRef.current, file, targetFormat as any,
+            p => updateFileState(id, { progress: p }),
             p => {
               updateFileState(id, { readProgress: p });
               if (p >= 99) {
-                  setTimeout(() => updateFileState(id, { status: 'converting' }), 100);
+                setTimeout(() => updateFileState(id, { status: 'converting' }), 100);
               }
             },
             targetDimensions
           );
         } else if (isPdf && targetFormat === ConversionTarget.TXT) {
-           convertedBlob = await convertPdfToText(file, p => updateFileState(id, { progress: p }));
-           updateFileState(id, { status: 'converting' });
+          convertedBlob = await convertPdfToText(file, p => updateFileState(id, { progress: p }));
+          updateFileState(id, { status: 'converting' });
+        } else if (isAudio && (targetFormat === ConversionTarget.TXT || targetFormat === ConversionTarget.SRT)) {
+          convertedBlob = await convertAudioToText(
+            file,
+            p => updateFileState(id, { progress: p }),
+            targetFormat as ConversionTarget.TXT | ConversionTarget.SRT
+          );
+          updateFileState(id, { status: 'converting' });
         } else {
           throw new Error('Unsupported file type or target format.');
         }
-        
+
         const url = URL.createObjectURL(convertedBlob);
         updateFileState(id, { convertedFileUrl: url, status: 'success', progress: 100 });
-        currentConverted++;
-        setConvertedCount(currentConverted);
       } catch (err: any) {
         const message = String(err);
         updateFileState(id, { error: message, status: 'error' });
-        currentConverted++;
-        setConvertedCount(currentConverted);
+      } finally {
+        completedCount += 1;
+        setConvertedCount(completedCount);
       }
-    }
-  
+    };
+
+    const workers = Array.from({ length: Math.min(MAX_CONCURRENT_CONVERSIONS, queue.length) }, async () => {
+      while (queue.length > 0) {
+        const nextFile = queue.shift();
+        if (!nextFile) break;
+        await convertSingleFile(nextFile);
+      }
+    });
+
+    await Promise.all(workers);
     setIsConverting(false);
   };
   
@@ -803,11 +922,30 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen flex flex-col items-center p-4 transition-colors duration-300">
+    <div
+      className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white h-screen overflow-y-auto flex flex-col items-center p-4 transition-colors duration-300 bg-cover bg-center bg-fixed overscroll-none"
+      style={wallpaper.enabled && wallpaper.dataUrl ? { backgroundImage: `url(${wallpaper.dataUrl})` } : undefined}
+    >
       {showOnboarding && <OnboardingModal language={language} onLanguageChange={setLanguage} onComplete={() => { localStorage.setItem('onboarding-complete', 'true'); setShowOnboarding(false); }} />}
+      {gpuToast && !showOnboarding && (
+        <div className="fixed left-4 top-4 z-40 max-w-xs rounded-lg border border-green-500/40 bg-gray-900/90 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 h-2.5 w-2.5 rounded-full bg-green-400" />
+            <div>
+              <div className="font-semibold text-green-300">{t('gpu_detected', language)}</div>
+              <div className="text-xs text-gray-200">{gpuToast}</div>
+            </div>
+          </div>
+        </div>
+      )}
       {isPasswordModalOpen && <PasswordModal onConfirm={createAndDownloadZip} onCancel={() => setIsPasswordModalOpen(false)} lang={language} />}
       {showEncryptionInfo && <EncryptionInfoAlert onClose={() => setShowEncryptionInfo(false)} lang={language} />}
-      <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 sm:p-8 space-y-6">
+      <div
+        className="w-full max-w-4xl rounded-lg shadow-xl p-6 sm:p-8 space-y-6 border border-white/20 backdrop-blur-sm transition-all duration-200"
+        style={{
+          backgroundColor: theme === 'dark' ? `rgba(31, 41, 55, ${uiTransparency})` : `rgba(255, 255, 255, ${uiTransparency})`,
+        }}
+      >
         <div className="flex justify-between items-center">
             <h1 className="text-4xl font-bold text-cyan-600 dark:text-cyan-400">{t('app_title', language)}</h1>
             <div className="flex items-center space-x-4">
@@ -817,22 +955,62 @@ const App: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
                     }
                 </button>
+                <button onClick={() => setCurrentView(currentView === 'home' ? 'settings' : 'home')} title="Settings" aria-label="Settings" className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
                 <select value={language} onChange={e => setLanguage(e.target.value)} className="bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-2 pl-3 pr-8 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
                     {appLanguages.map(lang => <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>)}
                 </select>
             </div>
         </div>
         
-        {files.length === 0 ? (
+        {currentView === 'settings' ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between"><h2 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">Settings</h2><button onClick={() => setCurrentView('home')} className="rounded-md bg-gray-200 px-4 py-2 font-semibold dark:bg-gray-700">Back</button></div>
+            <div className="rounded-lg border border-gray-300 bg-gray-100 p-5 dark:border-gray-600 dark:bg-gray-700/50">
+              <h3 className="text-lg font-semibold">Background</h3>
+              <p className="mt-1 break-all text-sm text-gray-600 dark:text-gray-300">{wallpaper.enabled ? wallpaper.path : 'Default wallpaper'}</p>
+              <p className="mt-3 rounded-md border border-amber-400/60 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">{t('wallpaper_notice', language)}</p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button onClick={chooseWallpaper} className="rounded-md bg-cyan-500 px-4 py-2 font-bold text-white hover:bg-cyan-600">{wallpaper.enabled ? 'Change background' : 'Add background'}</button>
+                <button onClick={disableWallpaper} disabled={!wallpaper.enabled} className="rounded-md bg-gray-500 px-4 py-2 font-bold text-white disabled:opacity-50">Turn background off</button>
+              </div>
+              <div className="mt-6 rounded-md border border-gray-300 bg-white/60 p-4 dark:border-gray-600 dark:bg-gray-900/30">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">UI transparency</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Makes the conversion panel more transparent so the wallpaper stays visible.</p>
+                  </div>
+                  <span className="min-w-12 text-right text-sm font-semibold text-cyan-600 dark:text-cyan-400">{uiTransparency.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.55}
+                  max={1}
+                  step={0.01}
+                  value={uiTransparency}
+                  onChange={event => setUiTransparency(Number(event.target.value))}
+                  className="mt-4 h-2 w-full cursor-pointer accent-cyan-500"
+                  aria-label="User interface transparency"
+                />
+              </div>
+            </div>
+          </div>
+        ) : files.length === 0 ? (
           <UploadArea />
         ) : (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
               <h2 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{t('queue_title', language)} ({files.length})</h2>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2 justify-end">
                 <button onClick={handleConvertAll} disabled={convertAllDisabled} className="bg-green-500 text-white font-bold py-2 px-4 rounded hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed transition">
                   {getConvertAllButtonText()}
                 </button>
+                {isConverting && isStalled && (
+                  <button onClick={handleCancelConversion} className="bg-red-500 text-white font-bold py-2 px-4 rounded hover:bg-red-600 transition">
+                    {t('cancel_conversion', language)}
+                  </button>
+                )}
                 <button onClick={reset} disabled={isConverting || isTraversing} className="bg-red-500 text-white font-bold py-2 px-4 rounded hover:bg-red-600 disabled:bg-gray-500 transition">
                   {t('clear_all', language)}
                 </button>
@@ -882,7 +1060,7 @@ const App: React.FC = () => {
                           className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         >
                           <option value="">{t('select_format', language)}</option>
-                          {[ConversionTarget.MP4, ConversionTarget.WEBM, ConversionTarget.WMV, ConversionTarget.MKV].map(f => <option key={f} value={f}>{f}</option>)}
+                          {[ConversionTarget.MP4, ConversionTarget.WEBM, ConversionTarget.WMV, ConversionTarget.MKV, ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG].map(f => <option key={f} value={f}>{f}</option>)}
                         </select>
                       </div>
                       <button onClick={handleApplyBulkVideoFormat} disabled={!bulkVideoFormat || isConverting} className="bg-cyan-500 text-white font-bold py-2 px-4 rounded hover:bg-cyan-600 disabled:bg-gray-500 transition h-[42px]">{t('apply', language)}</button>
@@ -899,7 +1077,7 @@ const App: React.FC = () => {
                           className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         >
                           <option value="">{t('select_format', language)}</option>
-                          {[ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG].map(f => <option key={f} value={f}>{f}</option>)}
+                          {[ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG, ConversionTarget.TXT, ConversionTarget.SRT].map(f => <option key={f} value={f}>{f}</option>)}
                         </select>
                       </div>
                       <button onClick={handleApplyBulkAudioFormat} disabled={!bulkAudioFormat || isConverting} className="bg-cyan-500 text-white font-bold py-2 px-4 rounded hover:bg-cyan-600 disabled:bg-gray-500 transition h-[42px]">{t('apply', language)}</button>
@@ -972,7 +1150,7 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2" ref={listRef}>
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto overscroll-contain pr-2" ref={listRef}>
               {paginatedFiles.map(fileItem => <FileItemMemo key={fileItem.id} fileItem={fileItem} isConverting={isConverting} updateFileState={updateFileState} removeFile={removeFile} lang={language} />)}
             </div>
 
@@ -1083,9 +1261,9 @@ const FileItem = memo<FileItemProps>(({ fileItem, isConverting, updateFileState,
 
   const availableFormats = useMemo(() => {
     if (isImage) return [ConversionTarget.JPG, ConversionTarget.PNG, ConversionTarget.WEBP, ConversionTarget.HEIC, ConversionTarget.AVIF, ConversionTarget.PDF, ConversionTarget.ICO, ConversionTarget.SVG];
-    if (isVideo) return [ConversionTarget.MP4, ConversionTarget.WEBM, ConversionTarget.WMV, ConversionTarget.MKV];
-    if (isAudio) return [ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG];
-    if (isPdf) return [ConversionTarget.TXT];
+    if (isVideo) return [ConversionTarget.MP4, ConversionTarget.WEBM, ConversionTarget.WMV, ConversionTarget.MKV, ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG];
+    if (isAudio) return [ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG, ConversionTarget.TXT, ConversionTarget.SRT];
+    if (isPdf) return [ConversionTarget.TXT, ConversionTarget.SRT];
     return [];
   }, [isImage, isVideo, isAudio, isPdf]);
 
