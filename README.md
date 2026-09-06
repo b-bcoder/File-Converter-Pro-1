@@ -45,7 +45,7 @@ It is built with Electron, React, Vite and FFmpeg, allowing it to handle a wide 
 
 Before running the project, install Node.js on your machine. The app uses npm scripts, so Node.js is required for the commands below.
 
-1. Download and install Node.js from: https://nodejs.org/
+1. Download and install Node.js from: [https://nodejs.org/](https://nodejs.org/).
 2. Open a terminal in the project folder.
 3. Install dependencies:
 
@@ -65,9 +65,15 @@ npm run dev
 npm run dist
 ```
 
-> Note: the generated installer is large and is intended for local use or distribution outside GitHub, not for uploading to GitHub because of the file size limit.
+The generated installer is written to the `release/` folder. It includes Whisper, its runtime files and the base English model, so end users do not need MSYS2, a separate Whisper installation or internet access for transcription.
 
-The current Windows installer is `release/File Converter Pro Setup 1.0.3.exe`. It includes Whisper, its runtime files and the base English model, so end users do not need MSYS2, a separate Whisper installation or internet access for transcription.
+### Download the Windows app
+
+End users do not need Node.js or the project source code. Download the latest Windows installer from the [GitHub Releases](https://github.com/uihorsewolf-design/File-Converter-Pro-1/releases) page and run the `.exe` installer.
+
+### Build from source
+
+Developers can install the dependencies and build a new Windows installer locally with `npm run dist`. The local `whisper-runtime/` folder is required during the build but is not committed to the repository because the Whisper model is larger than GitHub's regular file-upload limit. The runtime is bundled inside the generated installer.
 
 ## Usage
 
