@@ -1,12 +1,12 @@
 {
   "name": "bestandsconverter",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.3",
   "type": "module",
   "main": "electron-main.cjs",
   "description": "Offline bestandsconverter voor afbeeldingen, audio, video en PDF.",
   "author": "B&B Coder",
-  "copyright": "Copyright © 2026 B&B Coder",
+  "copyright": "Copyright © 2026 - B&B Coder",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"electron .\"",
     "build": "vite build",
@@ -55,7 +55,17 @@
       "assets/**/*"
     ],
     "asarUnpack": [
-      "node_modules/ffmpeg-static/**/*"
+      "node_modules/ffmpeg-static/**/*",
+      "node_modules/whisper-node/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "whisper-runtime",
+        "to": "whisper-runtime",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "directories": {
       "output": "release"

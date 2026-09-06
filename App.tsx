@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { ConversionTarget, FileStatus, ConversionFile } from './types';
 import { convertAudioToText, convertImage, convertMedia, convertPdfToText } from './services/fileConverter';
-import { resolutions } from './resolutions';
 import { t } from './i18n';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import coreURL from '@ffmpeg/core?url';
@@ -181,6 +180,22 @@ const EncryptionInfoAlert: React.FC<{ onClose: () => void; lang: string }> = ({ 
     );
 };
 
+type AvailableUpdate = { version: string; releaseUrl: string; downloadUrl: string; fileName: string };
+
+const UpdateModal: React.FC<{ update: AvailableUpdate; lang: string; onUpdate: () => void; onLater: () => void; isInstalling: boolean }> = ({ update, lang, onUpdate, onLater, isInstalling }) => (
+  <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+    <div className="w-full max-w-md rounded-lg bg-white p-6 text-gray-900 shadow-2xl dark:bg-gray-800 dark:text-white">
+      <h2 className="text-xl font-bold text-cyan-600 dark:text-cyan-400">{t('update_available', lang)}</h2>
+      <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">{t('update_message', lang)}</p>
+      <p className="mt-2 text-sm font-semibold">Version {update.version}</p>
+      <div className="mt-6 flex justify-end gap-3">
+        <button onClick={onLater} disabled={isInstalling} className="rounded-md bg-gray-500 px-4 py-2 font-bold text-white hover:bg-gray-600 disabled:opacity-50">{t('update_later', lang)}</button>
+        <button onClick={onUpdate} disabled={isInstalling} className="rounded-md bg-cyan-500 px-4 py-2 font-bold text-white hover:bg-cyan-600 disabled:opacity-50">{isInstalling ? t('processing', lang) : t('update_now', lang)}</button>
+      </div>
+    </div>
+  </div>
+);
+
 const appLanguages: { code: string; name: string; flag: string }[] = [
   { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -264,10 +279,14 @@ const App: React.FC = () => {
     return Math.min(1, Math.max(0.55, savedValue));
   });
   const [currentView, setCurrentView] = useState<'home' | 'settings'>('home');
+  const [outputDirectory, setOutputDirectory] = useState(() => localStorage.getItem('output-directory') || '');
+  const [deleteSources, setDeleteSources] = useState(() => localStorage.getItem('delete-sources') === 'true');
   const [wallpaper, setWallpaper] = useState<{ enabled: boolean; path: string | null; dataUrl: string | null }>({ enabled: false, path: null, dataUrl: null });
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('onboarding-complete') !== 'true');
   const [combineToPdf, setCombineToPdf] = useState(false);
   const [gpuToast, setGpuToast] = useState<string | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const [isStalled, setIsStalled] = useState(false);
   const ffmpegRef = useRef<any>(null);
   const ffmpegLoadingRef = useRef<boolean>(false);
@@ -299,8 +318,34 @@ const App: React.FC = () => {
   }, [uiTransparency]);
 
   useEffect(() => {
+    localStorage.setItem('output-directory', outputDirectory);
+  }, [outputDirectory]);
+
+  useEffect(() => {
+    localStorage.setItem('delete-sources', String(deleteSources));
+  }, [deleteSources]);
+
+  useEffect(() => {
     (window as any).electronAPI?.getWallpaper?.().then(setWallpaper).catch((error: unknown) => console.error('Failed to load wallpaper', error));
   }, []);
+
+  useEffect(() => {
+    if (showOnboarding) return;
+    (window as any).electronAPI?.checkForUpdate?.().then((update: AvailableUpdate | null) => {
+      if (update) setAvailableUpdate(update);
+    }).catch(() => undefined);
+  }, [showOnboarding]);
+
+  const installUpdate = async () => {
+    if (!availableUpdate) return;
+    setIsInstallingUpdate(true);
+    try {
+      await (window as any).electronAPI.downloadAndInstallUpdate(availableUpdate);
+    } catch (error) {
+      console.error('Failed to install update', error);
+      setIsInstallingUpdate(false);
+    }
+  };
 
   useEffect(() => {
     if (!isConverting) {
@@ -356,6 +401,11 @@ const App: React.FC = () => {
   const disableWallpaper = async () => {
     const nextWallpaper = await (window as any).electronAPI.disableWallpaper();
     setWallpaper(nextWallpaper);
+  };
+
+  const chooseOutputDirectory = async () => {
+    const selectedPath = await (window as any).electronAPI?.chooseOutputDirectory?.();
+    if (selectedPath) setOutputDirectory(selectedPath);
   };
 
   // Preload Everything on mount (Desktop App Mode)
@@ -481,6 +531,11 @@ const App: React.FC = () => {
 
   const handleConvertAll = async () => {
     if (isConverting) return;
+    if (deleteSources && !outputDirectory) {
+      alert(t('output_folder_help', language));
+      return;
+    }
+    if (deleteSources && !window.confirm(t('delete_sources_warning', language))) return;
     setIsConverting(true);
     setConvertedCount(0);
     setIsStalled(false);
@@ -561,47 +616,61 @@ const App: React.FC = () => {
     const convertSingleFile = async (fileItem: ConversionFile) => {
       updateFileState(fileItem.id, { status: 'reading', readProgress: 0, progress: 0, error: null });
 
-      const { id, file, targetFormat, targetDimensions } = fileItem;
+      const { id, file, targetFormat } = fileItem;
       const { isImage, isVideo, isAudio, isPdf } = getMediaType(file);
+      const electronApi = (window as any).electronAPI;
+      const sourcePath = electronApi?.getFilePath?.(file);
+      let stagedPath: string | undefined;
+      let conversionFile = file;
 
       try {
+        if (electronApi?.stageFile) {
+          try {
+            stagedPath = await electronApi.stageFile(sourcePath || await file.arrayBuffer(), file.name);
+            if (!isVideo && !isAudio && electronApi.readFile) {
+              conversionFile = new File([await electronApi.readFile(stagedPath)], file.name, { type: file.type });
+            }
+          } catch (stageError) {
+            console.warn(`Could not stage ${file.name}; using the selected file instead.`, stageError);
+          }
+        }
         let convertedBlob: Blob;
         const isHeifOrAvifSource = /\.(heic|heif|avif)$/i.test(file.name);
         const needsNativeImageConversion = targetFormat === ConversionTarget.HEIC || targetFormat === ConversionTarget.AVIF || isHeifOrAvifSource;
 
         if (isImage && needsNativeImageConversion && [ConversionTarget.JPG, ConversionTarget.PNG, ConversionTarget.WEBP, ConversionTarget.HEIC, ConversionTarget.AVIF].includes(targetFormat as any)) {
           convertedBlob = await convertMedia(ffmpegRef.current, file, targetFormat as any,
-            p => updateFileState(id, { progress: p }),
-            p => updateFileState(id, { readProgress: p }),
-            targetDimensions
+            (p, etaSeconds) => updateFileState(id, { progress: p, etaSeconds }),
+            p => updateFileState(id, { readProgress: p })
+            , stagedPath
           );
           updateFileState(id, { status: 'converting' });
         } else if (isImage && [ConversionTarget.JPG, ConversionTarget.PNG, ConversionTarget.WEBP, ConversionTarget.HEIC, ConversionTarget.AVIF, ConversionTarget.PDF, ConversionTarget.ICO, ConversionTarget.SVG].includes(targetFormat as any)) {
           if (targetFormat === ConversionTarget.SVG) {
             if (!isSvgReady) setIsSvgReady(true);
           }
-          convertedBlob = await convertImage(file, targetFormat as any, p => updateFileState(id, { readProgress: p }), targetDimensions);
+          convertedBlob = await convertImage(conversionFile, targetFormat as any, p => updateFileState(id, { readProgress: p }));
           updateFileState(id, { status: 'converting' });
         } else if ((isVideo || isAudio) && [ConversionTarget.MP4, ConversionTarget.WEBM, ConversionTarget.WMV, ConversionTarget.MKV, ConversionTarget.MP3, ConversionTarget.WAV, ConversionTarget.FLAC, ConversionTarget.OGG].includes(targetFormat as any)) {
           if (!ffmpegRef.current) {
             throw new Error('Media Engine not loaded yet.');
           }
           convertedBlob = await convertMedia(ffmpegRef.current, file, targetFormat as any,
-            p => updateFileState(id, { progress: p }),
+            (p, etaSeconds) => updateFileState(id, { progress: p, etaSeconds }),
             p => {
               updateFileState(id, { readProgress: p });
               if (p >= 99) {
                 setTimeout(() => updateFileState(id, { status: 'converting' }), 100);
               }
-            },
-            targetDimensions
+            }
+            , stagedPath
           );
         } else if (isPdf && targetFormat === ConversionTarget.TXT) {
-          convertedBlob = await convertPdfToText(file, p => updateFileState(id, { progress: p }));
+          convertedBlob = await convertPdfToText(conversionFile, p => updateFileState(id, { progress: p }));
           updateFileState(id, { status: 'converting' });
         } else if (isAudio && (targetFormat === ConversionTarget.TXT || targetFormat === ConversionTarget.SRT)) {
           convertedBlob = await convertAudioToText(
-            file,
+            conversionFile,
             p => updateFileState(id, { progress: p }),
             targetFormat as ConversionTarget.TXT | ConversionTarget.SRT
           );
@@ -611,11 +680,21 @@ const App: React.FC = () => {
         }
 
         const url = URL.createObjectURL(convertedBlob);
+        if (outputDirectory && (window as any).electronAPI?.writeOutputFile) {
+          const relativePath = fileItem.relativePath || file.name;
+          const sourceName = relativePath.replace(/\\/g, '/');
+          const dotIndex = sourceName.lastIndexOf('.');
+          const outputName = `${dotIndex > -1 ? sourceName.slice(0, dotIndex) : sourceName}.${targetFormat?.toLowerCase()}`;
+          const outputPath = `${outputDirectory.replace(/[\\/]$/, '')}/${outputName}`;
+          await electronApi.writeOutputFile(outputPath, await convertedBlob.arrayBuffer());
+          if (deleteSources && sourcePath) await electronApi.deleteSourceFile(sourcePath);
+        }
         updateFileState(id, { convertedFileUrl: url, status: 'success', progress: 100 });
       } catch (err: any) {
         const message = String(err);
         updateFileState(id, { error: message, status: 'error' });
       } finally {
+        if (stagedPath) await electronApi.cleanupStagedFile(stagedPath).catch(() => undefined);
         completedCount += 1;
         setConvertedCount(completedCount);
       }
@@ -632,6 +711,20 @@ const App: React.FC = () => {
     await Promise.all(workers);
     setIsConverting(false);
   };
+
+  const retryFile = useCallback((id: string) => {
+    if (isConverting) return;
+    setFiles(prev => prev.map(file => file.id === id
+      ? { ...file, status: 'pending', progress: 0, readProgress: 0, error: null, convertedFileUrl: null }
+      : file));
+  }, [isConverting]);
+
+  const retryFailed = useCallback(() => {
+    if (isConverting) return;
+    setFiles(prev => prev.map(file => file.status === 'error'
+      ? { ...file, status: 'pending', progress: 0, readProgress: 0, error: null, convertedFileUrl: null }
+      : file));
+  }, [isConverting]);
   
   
   const reset = () => {
@@ -927,6 +1020,7 @@ const App: React.FC = () => {
       style={wallpaper.enabled && wallpaper.dataUrl ? { backgroundImage: `url(${wallpaper.dataUrl})` } : undefined}
     >
       {showOnboarding && <OnboardingModal language={language} onLanguageChange={setLanguage} onComplete={() => { localStorage.setItem('onboarding-complete', 'true'); setShowOnboarding(false); }} />}
+      {availableUpdate && !showOnboarding && <UpdateModal update={availableUpdate} lang={language} onUpdate={installUpdate} onLater={() => setAvailableUpdate(null)} isInstalling={isInstallingUpdate} />}
       {gpuToast && !showOnboarding && (
         <div className="fixed left-4 top-4 z-40 max-w-xs rounded-lg border border-green-500/40 bg-gray-900/90 px-3 py-2 text-sm text-white shadow-lg backdrop-blur-sm">
           <div className="flex items-start gap-2">
@@ -967,6 +1061,18 @@ const App: React.FC = () => {
         {currentView === 'settings' ? (
           <div className="space-y-5">
             <div className="flex items-center justify-between"><h2 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">Settings</h2><button onClick={() => setCurrentView('home')} className="rounded-md bg-gray-200 px-4 py-2 font-semibold dark:bg-gray-700">Back</button></div>
+            <div className="rounded-lg border border-gray-300 bg-gray-100 p-5 dark:border-gray-600 dark:bg-gray-700/50">
+              <h3 className="text-lg font-semibold">{t('output_folder', language)}</h3>
+              <p className="mt-1 break-all text-sm text-gray-600 dark:text-gray-300">{outputDirectory || t('output_folder_help', language)}</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button onClick={chooseOutputDirectory} className="rounded-md bg-cyan-500 px-4 py-2 font-bold text-white hover:bg-cyan-600">{t('choose_output_folder', language)}</button>
+                {outputDirectory && <button onClick={() => setOutputDirectory('')} className="rounded-md bg-gray-500 px-4 py-2 font-bold text-white hover:bg-gray-600">{t('clear_all', language)}</button>}
+              </div>
+              <label className="mt-5 flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+                <input type="checkbox" checked={deleteSources} onChange={event => setDeleteSources(event.target.checked)} className="mt-1 h-4 w-4 accent-cyan-500" />
+                <span><span className="font-semibold">{t('delete_sources', language)}</span><span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">{t('delete_sources_warning', language)}</span></span>
+              </label>
+            </div>
             <div className="rounded-lg border border-gray-300 bg-gray-100 p-5 dark:border-gray-600 dark:bg-gray-700/50">
               <h3 className="text-lg font-semibold">Background</h3>
               <p className="mt-1 break-all text-sm text-gray-600 dark:text-gray-300">{wallpaper.enabled ? wallpaper.path : 'Default wallpaper'}</p>
@@ -1014,6 +1120,11 @@ const App: React.FC = () => {
                 <button onClick={reset} disabled={isConverting || isTraversing} className="bg-red-500 text-white font-bold py-2 px-4 rounded hover:bg-red-600 disabled:bg-gray-500 transition">
                   {t('clear_all', language)}
                 </button>
+                {files.some(file => file.status === 'error') && (
+                  <button onClick={retryFailed} disabled={isConverting} className="bg-amber-500 text-white font-bold py-2 px-4 rounded hover:bg-amber-600 disabled:bg-gray-500 transition">
+                    {t('retry_failed', language)}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1151,7 +1262,7 @@ const App: React.FC = () => {
             )}
 
             <div className="space-y-4 max-h-[50vh] overflow-y-auto overscroll-contain pr-2" ref={listRef}>
-              {paginatedFiles.map(fileItem => <FileItemMemo key={fileItem.id} fileItem={fileItem} isConverting={isConverting} updateFileState={updateFileState} removeFile={removeFile} lang={language} />)}
+              {paginatedFiles.map(fileItem => <FileItemMemo key={fileItem.id} fileItem={fileItem} isConverting={isConverting} updateFileState={updateFileState} removeFile={removeFile} onRetry={retryFile} lang={language} />)}
             </div>
 
             {/* Pagination Controls Bottom */}
@@ -1250,11 +1361,12 @@ interface FileItemProps {
   isConverting: boolean;
   updateFileState: (id: string, newProps: Partial<ConversionFile>) => void;
   removeFile: (id: string) => void;
+  onRetry: (id: string) => void;
   lang: string;
 }
 
-const FileItem = memo<FileItemProps>(({ fileItem, isConverting, updateFileState, removeFile, lang }) => {
-  const { id, file, status, targetFormat, readProgress, progress, convertedFileUrl, error, targetDimensions } = fileItem;
+const FileItem = memo<FileItemProps>(({ fileItem, isConverting, updateFileState, removeFile, onRetry, lang }) => {
+  const { id, file, status, targetFormat, readProgress, progress, etaSeconds, convertedFileUrl, error } = fileItem;
 
   const { isImage, isVideo, isAudio, isPdf } = getMediaType(file);
   const isProcessing = status === 'reading' || status === 'converting';
@@ -1266,16 +1378,6 @@ const FileItem = memo<FileItemProps>(({ fileItem, isConverting, updateFileState,
     if (isPdf) return [ConversionTarget.TXT, ConversionTarget.SRT];
     return [];
   }, [isImage, isVideo, isAudio, isPdf]);
-
-  const handleDimensionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    if (value === 'original') {
-        updateFileState(id, { targetDimensions: undefined });
-    } else {
-        const [width, height] = value.split('x').map(Number);
-        updateFileState(id, { targetDimensions: { width, height }});
-    }
-  };
 
   return (
     <div className="bg-gray-200 dark:bg-gray-700/50 p-4 rounded-lg space-y-3">
@@ -1307,32 +1409,13 @@ const FileItem = memo<FileItemProps>(({ fileItem, isConverting, updateFileState,
               {availableFormats.map(format => <option key={format} value={format}>{format}</option>)}
             </select>
           </div>
-          {(isImage || isVideo) && (
-            <div>
-              <label htmlFor={`dimensions-${id}`} className="sr-only">{t('resize', lang)}</label>
-              <select
-                id={`dimensions-${id}`}
-                value={targetDimensions ? `${targetDimensions.width}x${targetDimensions.height}` : 'original'}
-                onChange={handleDimensionChange}
-                className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                disabled={isConverting}
-              >
-                <option value="original">{t('original_size', lang)}</option>
-                {Object.entries(resolutions).map(([aspectRatio, resList]) => (
-                    <optgroup label={aspectRatio} key={aspectRatio}>
-                        {resList.map(res => <option key={res.value} value={res.value}>{res.label}</option>)}
-                    </optgroup>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
       )}
 
       {isProcessing && (
         <div className="space-y-2">
           {status === 'reading' && <ProgressBar label={t('loading', lang)} progress={readProgress} color="cyan" />}
-          {status === 'converting' && <ProgressBar label={t('converting', lang)} progress={progress} color="green" />}
+          {status === 'converting' && <ProgressBar label={t('converting', lang)} progress={progress} etaSeconds={etaSeconds} color="green" />}
         </div>
       )}
 
@@ -1371,6 +1454,7 @@ const FileItem = memo<FileItemProps>(({ fileItem, isConverting, updateFileState,
         <div className="text-center bg-red-200 dark:bg-red-900/50 border border-red-400 dark:border-red-700 p-2 rounded-lg">
           <p className="text-red-700 dark:text-red-400 text-sm font-semibold">{t('conversion_failed', lang)}</p>
           {error && <p className="text-red-600 dark:text-red-500 text-xs mt-1">{error}</p>}
+          <button onClick={() => onRetry(id)} disabled={isConverting} className="mt-2 rounded bg-amber-500 px-3 py-1 text-xs font-bold text-white hover:bg-amber-600 disabled:opacity-50">{t('retry', lang)}</button>
         </div>
       )}
     </div>
@@ -1379,13 +1463,21 @@ const FileItem = memo<FileItemProps>(({ fileItem, isConverting, updateFileState,
 
 const FileItemMemo = FileItem;
 
-const ProgressBar: React.FC<{label: string; progress: number, color: 'cyan' | 'green'}> = ({label, progress, color}) => {
+const formatEta = (seconds: number | null | undefined): string => {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '';
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}m ${remainder}s`;
+};
+
+const ProgressBar: React.FC<{label: string; progress: number, etaSeconds?: number | null, color: 'cyan' | 'green'}> = ({label, progress, etaSeconds, color}) => {
     const progressColor = color === 'cyan' ? 'bg-cyan-500' : 'bg-green-500';
     const textColor = color === 'cyan' ? 'text-cyan-600 dark:text-cyan-400' : 'text-green-600 dark:text-green-400';
     
     return (
         <div className="w-full space-y-1">
-            <p className={`text-center text-xs font-semibold ${textColor}`}>{label} {progress >= 0 && progress <= 100 ? `${progress}%` : ''}</p>
+            <p className={`text-center text-xs font-semibold ${textColor}`}>{label} {progress >= 0 && progress <= 100 ? `${progress}%` : ''}{etaSeconds !== undefined && etaSeconds !== null && progress < 100 ? ` - ${formatEta(etaSeconds)} remaining` : ''}</p>
             <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-2.5 relative overflow-hidden">
                 <div
                 className={`${progressColor} h-2.5 rounded-full transition-all duration-300`}

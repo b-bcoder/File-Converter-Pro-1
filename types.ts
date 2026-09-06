@@ -30,9 +30,9 @@ export interface ConversionFile {
   file: File;
   status: FileStatus;
   targetFormat: ConversionTarget | null;
-  targetDimensions?: { width: number; height: number; };
   readProgress: number;
   progress: number;
+  etaSeconds?: number | null;
   convertedFileUrl: string | null;
   error: string | null;
   relativePath?: string;

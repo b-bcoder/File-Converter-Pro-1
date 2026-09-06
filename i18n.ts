@@ -41,6 +41,39 @@ export const translations = {
   clear_all: {
     en: "Clear All", nl: "Alles wissen", tr: "Tümünü Temizle", zh: "全部清除", ja: "すべてクリア", fr: "Tout effacer", de: "Alle löschen",
   },
+  retry: {
+    en: "Retry", nl: "Opnieuw proberen", tr: "Yeniden dene", zh: "重试", ja: "再試行", fr: "Réessayer", de: "Erneut versuchen",
+  },
+  retry_failed: {
+    en: "Retry failed", nl: "Mislukte opnieuw proberen", tr: "Başarısızları yeniden dene", zh: "重试失败项", ja: "失敗した項目を再試行", fr: "Réessayer les échecs", de: "Fehlgeschlagene erneut versuchen",
+  },
+  update_available: {
+    en: "Update available", nl: "Update beschikbaar", tr: "Güncelleme mevcut", zh: "有可用更新", ja: "更新があります", fr: "Mise à jour disponible", de: "Update verfügbar",
+  },
+  update_message: {
+    en: "A newer version of File Converter Pro is available.", nl: "Er is een nieuwere versie van File Converter Pro beschikbaar.", tr: "File Converter Pro'nun daha yeni bir sürümü mevcut.", zh: "File Converter Pro 有较新版本可用。", ja: "File Converter Proの新しいバージョンが利用できます。", fr: "Une nouvelle version de File Converter Pro est disponible.", de: "Eine neuere Version von File Converter Pro ist verfügbar.",
+  },
+  update_now: {
+    en: "Update now", nl: "Nu bijwerken", tr: "Şimdi güncelle", zh: "立即更新", ja: "今すぐ更新", fr: "Mettre à jour maintenant", de: "Jetzt aktualisieren",
+  },
+  update_later: {
+    en: "Later", nl: "Later", tr: "Daha sonra", zh: "稍后", ja: "後で", fr: "Plus tard", de: "Später",
+  },
+  output_folder: {
+    en: "Output folder", nl: "Uitvoermap", tr: "Çıktı klasörü", zh: "输出文件夹", ja: "出力フォルダー", fr: "Dossier de sortie", de: "Ausgabeordner",
+  },
+  choose_output_folder: {
+    en: "Choose output folder", nl: "Kies uitvoermap", tr: "Çıktı klasörü seç", zh: "选择输出文件夹", ja: "出力フォルダーを選択", fr: "Choisir le dossier de sortie", de: "Ausgabeordner auswählen",
+  },
+  output_folder_help: {
+    en: "Converted files are also saved here. ZIP downloads remain available.", nl: "Geconverteerde bestanden worden hier ook opgeslagen. ZIP-downloads blijven beschikbaar.", tr: "Dönüştürülen dosyalar buraya da kaydedilir. ZIP indirmeleri kullanılabilir.", zh: "转换后的文件也会保存到这里。ZIP 下载仍然可用。", ja: "変換されたファイルもここに保存されます。ZIPダウンロードも引き続き利用できます。", fr: "Les fichiers convertis sont également enregistrés ici. Les téléchargements ZIP restent disponibles.", de: "Konvertierte Dateien werden ebenfalls hier gespeichert. ZIP-Downloads bleiben verfügbar.",
+  },
+  delete_sources: {
+    en: "Delete source files after successful conversion", nl: "Bronbestanden verwijderen na succesvolle conversie", tr: "Başarılı dönüşümden sonra kaynak dosyaları sil", zh: "转换成功后删除源文件", ja: "変換成功後に元ファイルを削除", fr: "Supprimer les fichiers source après conversion réussie", de: "Quelldateien nach erfolgreicher Konvertierung löschen",
+  },
+  delete_sources_warning: {
+    en: "The original files will be copied to temporary storage and deleted only after the converted files have been written successfully. This cannot be undone. Continue?", nl: "De originele bestanden worden naar tijdelijke opslag gekopieerd en pas verwijderd nadat de geconverteerde bestanden succesvol zijn opgeslagen. Dit kan niet ongedaan worden gemaakt. Doorgaan?", tr: "Orijinal dosyalar geçici depolamaya kopyalanacak ve yalnızca dönüştürülen dosyalar başarıyla yazıldıktan sonra silinecek. Bu işlem geri alınamaz. Devam edilsin mi?", zh: "原始文件将复制到临时存储，仅在转换文件成功写入后删除。此操作无法撤销。是否继续？", ja: "元ファイルは一時保存され、変換後のファイルが正常に書き込まれた後にのみ削除されます。この操作は元に戻せません。続行しますか？", fr: "Les fichiers originaux seront copiés dans un stockage temporaire et supprimés uniquement après l’écriture réussie des fichiers convertis. Cette action est irréversible. Continuer ?", de: "Die Originaldateien werden in einen temporären Speicher kopiert und erst gelöscht, nachdem die konvertierten Dateien erfolgreich geschrieben wurden. Dies kann nicht rückgängig gemacht werden. Fortfahren?",
+  },
   bulk_actions: {
     en: "Bulk Actions", nl: "Bulkacties", tr: "Toplu İşlemler", zh: "批量操作", ja: "一括操作", fr: "Actions groupées", de: "Massenaktionen",
   },

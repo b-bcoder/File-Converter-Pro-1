@@ -3,15 +3,23 @@ const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
+const os = require('node:os');
 const ffmpegPath = require('ffmpeg-static');
 
 const isDevelopment = !app.isPackaged;
 const developmentUrl = 'http://localhost:3000';
+const updateRepository = 'uihorsewolf-design/File-Converter-Pro-1';
 const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+const whisperRuntimePath = app.isPackaged
+  ? path.join(process.resourcesPath, 'whisper-runtime')
+  : path.join(__dirname, 'whisper-runtime');
 const whisperRootPath = path.join(__dirname, 'node_modules', 'whisper-node', 'lib', 'whisper.cpp').replace('app.asar', 'app.asar.unpacked');
-const whisperExecutablePath = path.join(whisperRootPath, process.platform === 'win32' ? 'main.exe' : 'main');
-const whisperModelPath = path.join(whisperRootPath, 'models', 'ggml-base.en.bin');
-const whisperRuntimePath = 'C:\\msys64\\mingw64\\bin';
+const whisperExecutablePath = process.platform === 'win32'
+  ? path.join(whisperRuntimePath, 'whisper-cli.exe')
+  : path.join(whisperRootPath, 'main');
+const whisperModelPath = process.platform === 'win32'
+  ? path.join(whisperRuntimePath, 'ggml-base.en.bin')
+  : path.join(whisperRootPath, 'models', 'ggml-base.en.bin');
 const gpuInfo = detectGpu();
 const nativeFfmpegPath = app.isPackaged
   ? ffmpegPath.replace('app.asar', 'app.asar.unpacked')
@@ -84,6 +92,39 @@ async function writeWallpaperConfig(enabled, wallpaperPath = '') {
 
 ipcMain.handle('fcp:get-ffmpeg-path', () => ffmpegPath);
 ipcMain.handle('fcp:get-gpu-info', () => gpuInfo);
+ipcMain.handle('fcp:check-for-update', async () => {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${updateRepository}/releases/latest`, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'File-Converter-Pro' }
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
+    const release = await response.json();
+    const latestVersion = String(release.tag_name || '').replace(/^v/i, '');
+    const currentVersion = app.getVersion().replace(/^v/i, '');
+    const parseVersion = version => version.split('-')[0].split('.').map(part => Number.parseInt(part, 10) || 0);
+    const current = parseVersion(currentVersion);
+    const latest = parseVersion(latestVersion);
+    const isNewer = latest.some((value, index) => value > (current[index] || 0) && latest.slice(0, index).every((part, partIndex) => part === current[partIndex]));
+    const installer = Array.isArray(release.assets) ? release.assets.find(asset => /\.exe$/i.test(asset.name) && asset.browser_download_url) : null;
+    if (!isNewer || !installer) return null;
+    return { version: latestVersion, releaseUrl: release.html_url, downloadUrl: installer.browser_download_url, fileName: installer.name };
+  } catch (error) {
+    console.warn('Update check failed:', error.message || error);
+    return null;
+  }
+});
+ipcMain.handle('fcp:download-and-install-update', async (_event, update) => {
+  if (!update?.downloadUrl || !/^https:\/\/github\.com\//i.test(update.downloadUrl)) throw new Error('Invalid update source.');
+  const response = await fetch(update.downloadUrl, { headers: { 'User-Agent': 'File-Converter-Pro' } });
+  if (!response.ok) throw new Error(`Update download failed with status ${response.status}`);
+  const installerPath = path.join(os.tmpdir(), update.fileName || 'File-Converter-Pro-update.exe');
+  await fs.writeFile(installerPath, Buffer.from(await response.arrayBuffer()));
+  if (process.platform !== 'win32') throw new Error('Automatic installation is currently supported on Windows only.');
+  spawn(installerPath, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref();
+  setTimeout(() => app.quit(), 250);
+  return true;
+});
 ipcMain.handle('fcp:cancel-conversion', async () => {
   if (activeConversionProcess && !activeConversionProcess.killed) {
     activeConversionProcess.kill('SIGKILL');
@@ -96,12 +137,17 @@ ipcMain.handle('fcp:transcribe-audio', async (event, fileData, fileName, targetF
   const workDir = path.join(app.getPath('temp'), 'fcp-whisper', randomUUID());
   const extension = path.extname(fileName) || '.wav';
   const inputPath = path.join(workDir, `input${extension}`);
-  const normalizedPath = path.join(workDir, 'input.wav');
+  const normalizedPath = path.join(workDir, 'normalized.wav');
 
   await fs.mkdir(workDir, { recursive: true });
   await fs.writeFile(inputPath, Buffer.from(fileData));
 
   try {
+    if (process.platform === 'win32') {
+      const runtimeFiles = ['whisper-cli.exe', 'whisper.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-base.en.bin'];
+      await Promise.all(runtimeFiles.map(fileName => fs.access(path.join(whisperRuntimePath, fileName))));
+    }
+
     const ffmpegArgs = ['-y', '-i', inputPath, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', normalizedPath];
     await new Promise((resolve, reject) => {
       const process = spawn(nativeFfmpegPath, ffmpegArgs, { windowsHide: true });
@@ -185,12 +231,43 @@ ipcMain.handle('fcp:choose-wallpaper', async () => {
   await writeWallpaperConfig(true, result.filePaths[0]);
   return readWallpaperConfig();
 });
+ipcMain.handle('fcp:choose-output-directory', async () => {
+  const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+  return result.canceled ? null : result.filePaths[0] || null;
+});
+ipcMain.handle('fcp:write-output-file', async (_event, filePath, data) => {
+  const resolvedPath = path.resolve(String(filePath));
+  await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
+  await fs.writeFile(resolvedPath, Buffer.from(data));
+  return resolvedPath;
+});
+ipcMain.handle('fcp:stage-file', async (_event, fileData, fileName) => {
+  const stagingDirectory = path.join(app.getPath('temp'), 'fcp-staging');
+  const stagedPath = path.join(stagingDirectory, `${randomUUID()}-${path.basename(String(fileName || 'input.bin'))}`);
+  await fs.mkdir(stagingDirectory, { recursive: true });
+  if (typeof fileData === 'string') {
+    await fs.copyFile(fileData, stagedPath);
+  } else {
+    await fs.writeFile(stagedPath, Buffer.from(fileData));
+  }
+  return stagedPath;
+});
+ipcMain.handle('fcp:cleanup-staged-file', async (_event, filePath) => {
+  await fs.rm(String(filePath), { force: true });
+  return true;
+});
+ipcMain.handle('fcp:delete-source-file', async (_event, filePath) => {
+  const sourcePath = path.resolve(String(filePath));
+  if (!sourcePath || sourcePath === path.parse(sourcePath).root) throw new Error('Refusing to delete an invalid source path.');
+  await fs.rm(sourcePath, { force: false });
+  return true;
+});
 ipcMain.handle('fcp:disable-wallpaper', async () => {
   const current = await readWallpaperConfig();
   await writeWallpaperConfig(false, current.path || '');
   return { enabled: false, path: current.path, dataUrl: null };
 });
-ipcMain.handle('fcp:convert-media', async (_event, fileData, fileName, targetFormat, targetDimensions) => {
+ipcMain.handle('fcp:convert-media', async (event, fileData, fileName, targetFormat) => {
   const workDir = path.join(app.getPath('temp'), 'fcp', randomUUID());
   const extension = path.extname(fileName) || '.bin';
   const inputPath = typeof fileData === 'string' ? fileData : path.join(workDir, `input${extension}`);
@@ -226,9 +303,7 @@ ipcMain.handle('fcp:convert-media', async (_event, fileData, fileName, targetFor
         finalArgs.push('-map', '0:a:0', '-vn', '-map_metadata', '-1', '-map_chapters', '-1');
       }
 
-      if (targetDimensions && !isAudioOutput) {
-        finalArgs.push('-vf', `scale=w=${targetDimensions.width}:h=${targetDimensions.height}:force_original_aspect_ratio=decrease,pad=${targetDimensions.width}:${targetDimensions.height}:-1:-1:color=black`);
-      }
+      finalArgs.push('-progress', 'pipe:2', '-nostats');
       finalArgs.push(outputPath);
       return finalArgs;
     };
@@ -239,6 +314,8 @@ ipcMain.handle('fcp:convert-media', async (_event, fileData, fileName, targetFor
         activeConversionProcess = process;
         let errorOutput = '';
         let lastOutputAt = Date.now();
+        let durationSeconds = 0;
+        const startedAt = Date.now();
 
         const timeoutId = setInterval(() => {
           if (Date.now() - lastOutputAt > 60000) {
@@ -249,8 +326,21 @@ ipcMain.handle('fcp:convert-media', async (_event, fileData, fileName, targetFor
         }, 2000);
 
         process.stderr.on('data', data => {
-          errorOutput += data.toString();
+          const text = data.toString();
+          errorOutput += text;
           lastOutputAt = Date.now();
+          const durationMatch = text.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+          if (durationMatch) {
+            durationSeconds = Number(durationMatch[1]) * 3600 + Number(durationMatch[2]) * 60 + Number(durationMatch[3]);
+          }
+          const timeMatch = text.match(/out_time_ms=(\d+)/);
+          if (timeMatch && durationSeconds > 0) {
+            const currentSeconds = Number(timeMatch[1]) / 1000000;
+            const progress = Math.min(100, Math.max(0, Math.round((currentSeconds / durationSeconds) * 100)));
+            const elapsedSeconds = (Date.now() - startedAt) / 1000;
+            const etaSeconds = progress > 0 ? Math.max(0, Math.round((elapsedSeconds / (progress / 100)) - elapsedSeconds)) : null;
+            event.sender.send('fcp:media-progress', { fileName, progress, etaSeconds });
+          }
         });
         process.on('error', error => {
           clearInterval(timeoutId);
@@ -300,7 +390,8 @@ function loadDevelopmentPage(window, attempt = 0) {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await fs.rm(path.join(app.getPath('temp'), 'fcp-staging'), { recursive: true, force: true });
   createWindow();
 
   app.on('activate', () => {

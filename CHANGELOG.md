@@ -13,6 +13,37 @@ This project uses the structure of [Keep a Changelog](https://keepachangelog.com
 - Further improvement of the user interface
 - Automatic updates for the desktop app
 
+## [1.0.3] - 2026-09-06
+
+### Added
+
+- Configurable output folder saved between sessions
+- Retry actions for individual failed conversions and all failed conversions
+- Native FFmpeg progress percentage and estimated remaining time
+- Temporary local staging during conversion, with optional deletion of sources after successful output
+- GitHub Release update checking for Windows installers
+
+### Removed
+
+- Resolution controls that added padding instead of true image upscaling
+
+## [1.0.2] - 2026-09-03
+
+### Added
+
+- Self-contained Windows Whisper runtime, including the executable, runtime libraries and base English model
+- Audio transcription to both TXT and SRT output
+
+### Fixed
+
+- Audio transcription no longer depends on an MSYS2 installation on the user's computer
+- WAV input is normalized to a separate temporary file instead of being overwritten in place by FFmpeg
+- Whisper runtime files are included in the Windows installer
+
+### Changed
+
+- Audio transcription now works offline on computers without a development environment
+
 ## [1.0.0] - 2026-08-31
 
 ### Added
