@@ -3,7 +3,7 @@
 ## Installation
 
 1. Open the `release` folder.
-2. Run `File Converter Pro Setup 0.0.3.exe`.
+2. Run the latest installer, for example `File Converter Pro Setup 1.0.2.exe`.
 3. Follow the Windows installation steps.
 4. Open File Converter Pro from the Start menu or shortcut.
 
@@ -19,6 +19,10 @@ Use the complete `.exe` installer. The `.blockmap` and `.__uninstaller.exe` file
 
 You can also drag files into the window.
 
+## Audio transcription
+
+Add an audio file, select `TXT` for text or `SRT` for subtitles, and click `Convert All`. Whisper is included in the installer and runs locally; no MSYS2 installation or internet connection is required. WAV files are normalized automatically.
+
 ## Important
 
 The app checks at the start of the conversion whether each source file is still available in its original location. If a file has been deleted, moved, or is no longer accessible, an error message appears and the conversion of that file is not continued. The conversion for the other files continues as usual.
@@ -32,3 +36,7 @@ The app checks at the start of the conversion whether each source file is still 
 - Press `F11` to toggle fullscreen.
 
 The app processes files locally. Files are not uploaded.
+
+## Background
+
+Click the gear icon next to the light/dark toggle. In Settings, choose `Add background` or `Change background`. Choose `Turn background off` to return to the default background. Use an image with the same aspect ratio as your screen, otherwise the background may be stretched.

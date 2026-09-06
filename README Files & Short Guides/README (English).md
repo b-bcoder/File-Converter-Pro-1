@@ -12,6 +12,7 @@ File Converter Pro is a Windows desktop application for converting image, video,
 - Convert images to JPG, PNG, WEBP, HEIC, AVIF, PDF, ICO and SVG
 - Convert video to MP4, WEBM, WMV and MKV
 - Convert audio to MP3, WAV, FLAC and OGG
+- Transcribe audio locally to TXT or SRT with Whisper
 - Extract text from PDF files
 - Combine multiple images into one PDF
 - Process files and folders in batches
@@ -26,7 +27,7 @@ File Converter Pro is a Windows desktop application for converting image, video,
 ## Installation
 
 1. Open the `release` folder.
-2. Run `File Converter Pro Setup 0.0.3.exe`.
+2. Run the latest installer, for example `File Converter Pro Setup 1.0.2.exe`.
 3. Follow the Windows installation steps.
 4. Launch the app from the Start menu or shortcut.
 
@@ -42,6 +43,15 @@ After installation, Windows creates a desktop shortcut. The app starts automatic
 5. Select `Convert All`.
 6. Download results individually or as a ZIP archive.
 
+### Audio transcription
+
+1. Add a WAV, MP3, M4A, OGG or another supported audio file.
+2. Select `TXT` for plain text or `SRT` for subtitles.
+3. Select `Convert All` and wait for the transcription to finish.
+4. Download the generated transcript.
+
+Transcription runs locally with the Whisper engine included in the installer. No MSYS2, separate Whisper installation or internet connection is required. WAV files are normalized automatically before transcription.
+
 For the best result, use a valid source file, a suitable output format and an appropriate resolution. Large media files may take longer to process.
 
 ## GPU acceleration
@@ -53,6 +63,10 @@ The app checks the installed video adapter at startup. If only an integrated GPU
 - `F11`: toggle fullscreen
 
 The Electron menu bar is hidden. The app starts in borderless fullscreen mode.
+
+## Set a background
+
+Click the gear icon next to the light/dark toggle on the home page. Choose `Add background` or `Change background` and select an image. Choose `Turn background off` to return to the default background. The choice is stored locally in `config.json` and checked on every startup. Use an image with the same aspect ratio as your screen, otherwise the background may be stretched.
 
 ## First run
 
@@ -86,7 +100,7 @@ The installer is created at `release/File Converter Pro Setup <version>.exe`.
 - electron-builder: Windows installer
 - FFmpeg and `ffmpeg-static`: video and audio conversion
 - PDF.js and jsPDF: reading and creating PDFs
-- libheif-js: HEIC/AVIF support
+- FFmpeg: HEIC/AVIF support
 - ImageTracerJS: SVG conversion
 - zip.js: ZIP archives and AES-256 encryption
 - Tailwind CSS, PostCSS and Autoprefixer: styling

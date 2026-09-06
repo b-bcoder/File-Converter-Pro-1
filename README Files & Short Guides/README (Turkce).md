@@ -12,6 +12,7 @@ File Converter Pro, görüntü, video, ses ve PDF dosyalarını yerel olarak dö
 - Görüntüleri JPG, PNG, WEBP, HEIC, AVIF, PDF, ICO ve SVG formatlarına dönüştürme
 - Videoları MP4, WEBM, WMV ve MKV formatlarına dönüştürme
 - Ses dosyalarını MP3, WAV, FLAC ve OGG formatlarına dönüştürme
+- Ses dosyalarını Whisper ile yerel olarak TXT veya SRT formatına dönüştürme
 - PDF dosyalarından metin çıkarma
 - Birden fazla görüntüyü tek PDF dosyasında birleştirme
 - Dosya ve klasörleri toplu işleme
@@ -26,7 +27,7 @@ File Converter Pro, görüntü, video, ses ve PDF dosyalarını yerel olarak dö
 ## Kurulum
 
 1. `release` klasörünü açın.
-2. `File Converter Pro Setup 0.0.3.exe` dosyasını çalıştırın.
+2. En güncel yükleyiciyi, örneğin `File Converter Pro Setup 1.0.2.exe` dosyasını çalıştırın.
 3. Windows kurulum adımlarını izleyin.
 4. Uygulamayı Başlat menüsünden veya kısayoldan açın.
 
@@ -41,6 +42,15 @@ Kurulumdan sonra Windows masaüstünde bir kısayol oluşturur. Uygulama varsay�
 4. Birden fazla dosya için toplu işlemleri kullanın.
 5. `Convert All` seçeneğine tıklayın.
 6. Sonuçları ayrı ayrı veya ZIP olarak indirin.
+
+### Ses transkripsiyonu
+
+1. WAV, MP3, M4A, OGG veya desteklenen başka bir ses dosyası ekleyin.
+2. Düz metin için `TXT`, altyazı için `SRT` seçin.
+3. `Convert All` seçeneğine tıklayın ve transkripsiyonun tamamlanmasını bekleyin.
+4. Oluşturulan metni indirin.
+
+Transkripsiyon, yükleyiciye dahil edilen Whisper ile yerel olarak çalışır. MSYS2, ayrı bir Whisper kurulumu veya internet bağlantısı gerekmez. WAV dosyaları transkripsiyondan önce otomatik olarak normalleştirilir.
 
 En iyi sonuç için geçerli bir kaynak dosyası, uygun bir çıkış formatı ve doğru çözünürlük kullanın. Büyük medya dosyalarının işlenmesi daha uzun sürebilir.
 
@@ -86,7 +96,7 @@ Yükleyici `release/File Converter Pro Setup <sürüm>.exe` konumunda oluşturul
 - electron-builder: Windows yükleyicisi
 - FFmpeg ve `ffmpeg-static`: video ve ses dönüştürme
 - PDF.js ve jsPDF: PDF okuma ve oluşturma
-- libheif-js: HEIC/AVIF desteği
+- FFmpeg: HEIC/AVIF desteği
 - ImageTracerJS: SVG dönüştürme
 - zip.js: ZIP ve AES-256 şifreleme
 - Tailwind CSS, PostCSS ve Autoprefixer: stil
@@ -95,6 +105,10 @@ Yükleyici `release/File Converter Pro Setup <sürüm>.exe` konumunda oluşturul
 ## Teknoloji ve gizlilik
 
 Renderer `contextIsolation: true` ve `nodeIntegration: false` kullanır. Yerel işlevler sınırlı preload IPC API üzerinden sunulur. Dönüştürme işlemleri yerel olarak yapılır. İnternet yalnızca ilk npm kurulumu sırasında gereklidir.
+
+## Arka plan ayarlama
+
+Ana sayfada açık/koyu tema düğmesinin yanındaki dişli simgesine tıklayın. `Arka plan ekle` veya `Arka planı değiştir` seçeneklerinden birini seçip bir görüntü belirleyin. Varsayılan arka plana dönmek için `Arka planı kapat` seçeneğini kullanın. Seçim yerel olarak `config.json` dosyasına kaydedilir. Görüntünün esnememesi için ekranınızla aynı en-boy oranına sahip bir görsel kullanın.
 
 ## Katkı ve teşekkürler
 

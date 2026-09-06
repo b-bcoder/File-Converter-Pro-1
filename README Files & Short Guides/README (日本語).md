@@ -12,6 +12,7 @@ File Converter Pro は、画像、動画、音声、PDF ファイルをローカ
 - 画像を JPG、PNG、WEBP、HEIC、AVIF、PDF、ICO、SVG に変換
 - 動画を MP4、WEBM、WMV、MKV に変換
 - 音声を MP3、WAV、FLAC、OGG に変換
+- Whisper を使用して音声をローカルで TXT または SRT に文字起こし
 - PDF ファイルからテキストを抽出
 - 複数の画像を 1 つの PDF に結合
 - ファイルやフォルダーを一括処理
@@ -26,7 +27,7 @@ File Converter Pro は、画像、動画、音声、PDF ファイルをローカ
 ## インストール
 
 1. `release` フォルダーを開きます。
-2. `File Converter Pro Setup 0.0.3.exe` を実行します。
+2. 最新のインストーラー（例: `File Converter Pro Setup 1.0.2.exe`）を実行します。
 3. Windows のインストール手順に従います。
 4. スタートメニューまたはショートカットからアプリを起動します。
 
@@ -41,6 +42,15 @@ File Converter Pro は、画像、動画、音声、PDF ファイルをローカ
 4. 複数のファイルを処理する場合は一括操作を使用します。
 5. `Convert All` を選択します。
 6. 結果を個別に、または ZIP としてダウンロードします。
+
+### 音声の文字起こし
+
+1. WAV、MP3、M4A、OGG または対応する音声ファイルを追加します。
+2. 通常のテキストには `TXT`、字幕には `SRT` を選択します。
+3. `Convert All` を選択し、文字起こしが完了するまで待ちます。
+4. 生成された文字起こしファイルをダウンロードします。
+
+文字起こしはインストーラーに含まれる Whisper でローカル実行されます。MSYS2、別途 Whisper をインストールする必要、インターネット接続は不要です。WAV ファイルは文字起こし前に自動的に正規化されます。
 
 最適な結果を得るには、破損していないソースファイル、目的に合った形式、適切な解像度を使用してください。大きなメディアファイルは処理に時間がかかる場合があります。
 
@@ -86,7 +96,7 @@ npm run dist
 - electron-builder: Windows インストーラー
 - FFmpeg と `ffmpeg-static`: 動画・音声変換
 - PDF.js と jsPDF: PDF の読み込みと作成
-- libheif-js: HEIC/AVIF 対応
+- FFmpeg: HEIC/AVIF 対応
 - ImageTracerJS: SVG 変換
 - zip.js: ZIP と AES-256 暗号化
 - Tailwind CSS、PostCSS、Autoprefixer: スタイリング
@@ -95,6 +105,10 @@ npm run dist
 ## 技術とプライバシー
 
 Renderer は `contextIsolation: true` と `nodeIntegration: false` を使用します。ネイティブ機能は制限された preload IPC API を通じて提供されます。変換はローカルで実行されます。インターネットが必要なのは最初の npm インストール時だけです。
+
+## 背景を設定する
+
+ホームページでライト／ダーク切り替えボタンの横にある歯車アイコンをクリックします。`背景を追加` または `背景を変更` を選び、画像を指定します。`背景をオフ` を選ぶとデフォルトの背景に戻ります。設定は `config.json` にローカル保存され、起動時に確認されます。画像が引き伸ばされないよう、画面と同じアスペクト比の画像を使用してください。
 
 ## クレジット
 

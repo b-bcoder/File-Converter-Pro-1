@@ -12,6 +12,7 @@ File Converter Pro ist eine Windows-Desktopanwendung zum lokalen Konvertieren vo
 - Bilder in JPG, PNG, WEBP, HEIC, AVIF, PDF, ICO und SVG konvertieren
 - Videos in MP4, WEBM, WMV und MKV konvertieren
 - Audio in MP3, WAV, FLAC und OGG konvertieren
+- Audio lokal mit Whisper in TXT oder SRT transkribieren
 - Text aus PDF-Dateien extrahieren
 - Mehrere Bilder zu einer PDF-Datei zusammenfassen
 - Dateien und Ordner stapelweise verarbeiten
@@ -26,7 +27,7 @@ File Converter Pro ist eine Windows-Desktopanwendung zum lokalen Konvertieren vo
 ## Installation
 
 1. Öffnen Sie den Ordner `release`.
-2. Starten Sie `File Converter Pro Setup 0.0.3.exe`.
+2. Starten Sie den neuesten Installer, zum Beispiel `File Converter Pro Setup 1.0.2.exe`.
 3. Folgen Sie den Windows-Installationsschritten.
 4. Starten Sie die App über das Startmenü oder die Verknüpfung.
 
@@ -42,6 +43,15 @@ Nach der Installation erstellt Windows eine Desktopverknüpfung. Die App startet
 5. Wählen Sie `Convert All`.
 6. Laden Sie die Ergebnisse einzeln oder als ZIP-Datei herunter.
 
+### Audiotranskription
+
+1. Fügen Sie eine WAV-, MP3-, M4A-, OGG- oder andere unterstützte Audiodatei hinzu.
+2. Wählen Sie `TXT` für Text oder `SRT` für Untertitel.
+3. Wählen Sie `Convert All` und warten Sie, bis die Transkription abgeschlossen ist.
+4. Laden Sie das Transkript herunter.
+
+Die Transkription läuft lokal mit Whisper, das im Installer enthalten ist. MSYS2, eine separate Whisper-Installation oder eine Internetverbindung ist nicht erforderlich. WAV-Dateien werden vor der Transkription automatisch normalisiert.
+
 Für beste Ergebnisse sollten Sie eine gültige Quelldatei, ein geeignetes Ausgabeformat und eine passende Auflösung verwenden. Große Mediendateien können länger dauern.
 
 ## GPU-Beschleunigung
@@ -53,6 +63,10 @@ Beim Start prüft die App den installierten Grafikadapter. Wenn nur eine integri
 - `F11`: Vollbild ein- oder ausschalten
 
 Die Electron-Menüleiste ist ausgeblendet. Die App startet im randlosen Vollbildmodus.
+
+## Hintergrund festlegen
+
+Klicken Sie auf der Startseite auf das Zahnradsymbol neben dem Hell-/Dunkel-Schalter. Wählen Sie `Hintergrund hinzufügen` oder `Hintergrund ändern` und wählen Sie ein Bild aus. Mit `Hintergrund ausschalten` kehren Sie zum Standardhintergrund zurück. Die Auswahl wird lokal in `config.json` gespeichert und bei jedem Start überprüft. Verwenden Sie ein Bild mit demselben Seitenverhältnis wie Ihr Bildschirm, da der Hintergrund sonst gestreckt werden kann.
 
 ## Erster Start
 
@@ -86,7 +100,7 @@ Der Installer wird unter `release/File Converter Pro Setup <Version>.exe` erstel
 - electron-builder: Windows-Installer
 - FFmpeg und `ffmpeg-static`: Video- und Audiokonvertierung
 - PDF.js und jsPDF: PDF lesen und erstellen
-- libheif-js: HEIC/AVIF-Unterstützung
+- FFmpeg: HEIC/AVIF-Unterstützung
 - ImageTracerJS: SVG-Konvertierung
 - zip.js: ZIP-Dateien und AES-256-Verschlüsselung
 - Tailwind CSS, PostCSS und Autoprefixer: Styling

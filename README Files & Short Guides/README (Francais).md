@@ -12,6 +12,7 @@ File Converter Pro est une application de bureau Windows qui convertit localemen
 - Convertir les images en JPG, PNG, WEBP, HEIC, AVIF, PDF, ICO et SVG
 - Convertir les vidéos en MP4, WEBM, WMV et MKV
 - Convertir l'audio en MP3, WAV, FLAC et OGG
+- Transcrire localement l'audio en TXT ou SRT avec Whisper
 - Extraire le texte des fichiers PDF
 - Combiner plusieurs images dans un seul PDF
 - Traiter des fichiers et des dossiers par lots
@@ -26,7 +27,7 @@ File Converter Pro est une application de bureau Windows qui convertit localemen
 ## Installation
 
 1. Ouvrez le dossier `release`.
-2. Lancez `File Converter Pro Setup 0.0.3.exe`.
+2. Lancez le dernier installateur, par exemple `File Converter Pro Setup 1.0.2.exe`.
 3. Suivez les étapes d'installation de Windows.
 4. Lancez l'application depuis le menu Démarrer ou le raccourci.
 
@@ -42,6 +43,15 @@ Après l'installation, Windows crée un raccourci sur le bureau. L'application d
 5. Sélectionnez `Convert All`.
 6. Téléchargez les résultats séparément ou sous forme d'archive ZIP.
 
+### Transcription audio
+
+1. Ajoutez un fichier audio WAV, MP3, M4A, OGG ou autre format pris en charge.
+2. Sélectionnez `TXT` pour du texte brut ou `SRT` pour des sous-titres.
+3. Sélectionnez `Convert All` et attendez la fin de la transcription.
+4. Téléchargez la transcription générée.
+
+La transcription fonctionne localement avec Whisper, inclus dans l'installateur. MSYS2, une installation séparée de Whisper ou une connexion Internet ne sont pas nécessaires. Les fichiers WAV sont automatiquement normalisés avant la transcription.
+
 Pour un meilleur résultat, utilisez un fichier source valide, un format adapté et une résolution appropriée. Les fichiers multimédias volumineux peuvent prendre plus de temps.
 
 ## Accélération GPU
@@ -53,6 +63,10 @@ L'application vérifie l'adaptateur vidéo au démarrage. Si seul un GPU intégr
 - `F11` : activer ou désactiver le plein écran
 
 La barre de menus Electron est masquée. L'application démarre en plein écran sans bordure.
+
+## Définir un arrière-plan
+
+Cliquez sur l’icône d’engrenage à côté du bouton clair/sombre sur la page d’accueil. Choisissez `Ajouter un arrière-plan` ou `Modifier l’arrière-plan`, puis sélectionnez une image. Choisissez `Désactiver l’arrière-plan` pour revenir à l’arrière-plan par défaut. Le choix est enregistré localement dans `config.json` et vérifié à chaque démarrage. Utilisez une image avec le même rapport d’aspect que votre écran, sinon l’arrière-plan peut être étiré.
 
 ## Premier démarrage
 
@@ -86,7 +100,7 @@ L'installateur est créé dans `release/File Converter Pro Setup <version>.exe`.
 - electron-builder : installateur Windows
 - FFmpeg et `ffmpeg-static` : conversion vidéo et audio
 - PDF.js et jsPDF : lecture et création de PDF
-- libheif-js : prise en charge HEIC/AVIF
+- FFmpeg : prise en charge HEIC/AVIF
 - ImageTracerJS : conversion SVG
 - zip.js : archives ZIP et chiffrement AES-256
 - Tailwind CSS, PostCSS et Autoprefixer : styles

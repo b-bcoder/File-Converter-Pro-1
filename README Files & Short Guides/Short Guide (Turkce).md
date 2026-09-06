@@ -3,7 +3,7 @@
 ## Kurulum
 
 1. `release` klasörünü açın.
-2. `File Converter Pro Setup 0.0.3.exe` dosyasını çalıştırın.
+2. En güncel yükleyiciyi, örneğin `File Converter Pro Setup 1.0.2.exe` dosyasını çalıştırın.
 3. Windows kurulum adımlarını izleyin.
 4. File Converter Pro'yu Başlat menüsünden veya kısayoldan açın.
 
@@ -19,6 +19,10 @@ Tam `.exe` yükleyicisini kullanın. `.blockmap` ve `.__uninstaller.exe` dosyala
 
 Dosyaları pencereye sürükleyerek de ekleyebilirsiniz.
 
+## Ses transkripsiyonu
+
+Bir ses dosyası ekleyin, metin için `TXT` veya altyazı için `SRT` seçin ve `Convert All` seçeneğine tıklayın. Whisper yükleyiciye dahildir ve yerel olarak çalışır; MSYS2 veya internet bağlantısı gerekmez. WAV dosyaları otomatik olarak normalleştirilir.
+
 ## Önemli
 
 Uygulama, dönüşümü başlatırken her kaynak dosyanın orijinal konumda hâlâ mevcut olup olmadığını kontrol eder. Bir dosya silinmiş, taşınmış veya artık erişilemez durumdaysa, bir hata mesajı görünür ve o dosyanın dönüşümü devam etmez. Diğer dosyalar için dönüşüm normal şekilde devam eder.
@@ -32,3 +36,7 @@ Uygulama, dönüşümü başlatırken her kaynak dosyanın orijinal konumda hâl
 - Tam ekranı açıp kapatmak için `F11` tuşuna basın.
 
 Uygulama dosyaları yerel olarak işler. Dosyalar yüklenmez.
+
+## Arka plan
+
+Dişli simgesine tıklayın. Ayarlar bölümünde `Arka plan ekle` veya `Arka planı değiştir` seçeneğini kullanın. `Arka planı kapat` ile varsayılan arka plana dönersiniz. Görüntünün esnememesi için ekranınızla aynı en-boy oranına sahip bir görsel seçin.

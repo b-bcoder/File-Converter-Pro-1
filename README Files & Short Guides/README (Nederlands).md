@@ -12,6 +12,7 @@ File Converter Pro is een Windows-desktopapp waarmee je afbeeldingen, video, aud
 - Afbeeldingen converteren naar JPG, PNG, WEBP, HEIC, AVIF, PDF, ICO en SVG
 - Video converteren naar MP4, WEBM, WMV en MKV
 - Audio converteren naar MP3, WAV, FLAC en OGG
+- Audio lokaal transcriberen naar TXT of SRT met Whisper
 - PDF-bestanden naar tekst converteren
 - Meerdere afbeeldingen combineren tot één PDF
 - Bestanden en mappen tegelijk verwerken
@@ -26,7 +27,7 @@ File Converter Pro is een Windows-desktopapp waarmee je afbeeldingen, video, aud
 ## Installeren
 
 1. Open de map `release`.
-2. Start `File Converter Pro Setup 0.0.3.exe`.
+2. Start de nieuwste installer, bijvoorbeeld `File Converter Pro Setup 1.0.2.exe`.
 3. Volg de Windows-installatiestappen.
 4. Start de app via het Startmenu of de snelkoppeling.
 
@@ -42,6 +43,15 @@ Na de installatie maakt Windows een snelkoppeling op het bureaublad aan. De app 
 5. Kies `Convert All`.
 6. Download de resultaten afzonderlijk of als ZIP.
 
+### Audio transcriberen
+
+1. Voeg een WAV-, MP3-, M4A-, OGG- of ander ondersteund audiobestand toe.
+2. Kies `TXT` voor gewone tekst of `SRT` voor ondertitels.
+3. Kies `Convert All` en wacht tot de transcriptie klaar is.
+4. Download het transcript.
+
+De transcriptie draait lokaal met Whisper, dat in de installer is meegeleverd. MSYS2, een aparte Whisper-installatie of internet is niet nodig. WAV-bestanden worden automatisch genormaliseerd voordat ze worden getranscribeerd.
+
 Gebruik voor de beste kwaliteit een niet-beschadigd bronbestand, een passend formaat en een geschikte resolutie. Grote mediabestanden kunnen langer duren.
 
 ## GPU-acceleratie
@@ -53,6 +63,10 @@ De app controleert bij het opstarten de videokaart. Bij alleen een geïntegreerd
 - `F11`: fullscreen aan of uit
 
 De Electron-menubalk is verborgen. De app start standaard borderless fullscreen.
+
+## Achtergrond instellen
+
+Klik op het tandwiel naast de light/dark-toggle op de homepagina. Kies `Achtergrond toevoegen` of `Achtergrond wijzigen` en selecteer een afbeelding. Kies `Achtergrond uitzetten` om terug te keren naar de standaardachtergrond. De keuze wordt lokaal opgeslagen in `config.json` en bij iedere start gecontroleerd. Gebruik een afbeelding met dezelfde beeldverhouding als je scherm, anders kan de achtergrond uitrekken.
 
 ## Eerste start
 
@@ -86,7 +100,7 @@ De installer wordt gemaakt in `release/File Converter Pro Setup <versie>.exe`.
 - electron-builder: Windows-installer
 - FFmpeg en `ffmpeg-static`: video- en audioconversie
 - PDF.js en jsPDF: PDF lezen en maken
-- libheif-js: HEIC/AVIF
+- FFmpeg: HEIC/AVIF
 - ImageTracerJS: SVG-conversie
 - zip.js: ZIP en AES-256
 - Tailwind CSS, PostCSS en Autoprefixer: styling

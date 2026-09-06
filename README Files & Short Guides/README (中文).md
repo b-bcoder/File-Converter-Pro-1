@@ -12,6 +12,7 @@ File Converter Pro 是一款 Windows 桌面应用，可在本地转换图像、�
 - 将图像转换为 JPG、PNG、WEBP、HEIC、AVIF、PDF、ICO 和 SVG
 - 将视频转换为 MP4、WEBM、WMV 和 MKV
 - 将音频转换为 MP3、WAV、FLAC 和 OGG
+- 使用 Whisper 在本地将音频转录为 TXT 或 SRT
 - 从 PDF 文件中提取文本
 - 将多张图像合并为一个 PDF
 - 批量处理文件和文件夹
@@ -26,7 +27,7 @@ File Converter Pro 是一款 Windows 桌面应用，可在本地转换图像、�
 ## 安装
 
 1. 打开 `release` 文件夹。
-2. 运行 `File Converter Pro Setup 0.0.3.exe`。
+2. 运行最新的安装程序，例如 `File Converter Pro Setup 1.0.2.exe`。
 3. 按照 Windows 安装步骤操作。
 4. 从开始菜单或快捷方式启动应用。
 
@@ -41,6 +42,15 @@ File Converter Pro 是一款 Windows 桌面应用，可在本地转换图像、�
 4. 处理多个文件时可以使用批量操作。
 5. 选择 `Convert All`。
 6. 单独下载结果，或将全部结果下载为 ZIP 文件。
+
+### 音频转录
+
+1. 添加 WAV、MP3、M4A、OGG 或其他受支持的音频文件。
+2. 选择 `TXT` 生成纯文本，或选择 `SRT` 生成字幕。
+3. 选择 `Convert All` 并等待转录完成。
+4. 下载生成的转录文件。
+
+转录使用安装程序中包含的 Whisper 在本地运行。不需要 MSYS2、单独安装 Whisper 或互联网连接。WAV 文件会在转录前自动标准化。
 
 为了获得最佳效果，请使用有效的源文件、合适的输出格式和适当的分辨率。大型媒体文件可能需要更长的处理时间。
 
@@ -86,7 +96,7 @@ npm run dist
 - electron-builder：Windows 安装程序
 - FFmpeg 和 `ffmpeg-static`：视频和音频转换
 - PDF.js 和 jsPDF：读取和创建 PDF
-- libheif-js：HEIC/AVIF 支持
+- FFmpeg：HEIC/AVIF 支持
 - ImageTracerJS：SVG 转换
 - zip.js：ZIP 文件和 AES-256 加密
 - Tailwind CSS、PostCSS 和 Autoprefixer：样式
@@ -95,6 +105,10 @@ npm run dist
 ## 技术与隐私
 
 渲染进程使用 `contextIsolation: true` 和 `nodeIntegration: false`。原生功能通过受限的 preload IPC API 提供。转换过程在本地完成。只有首次 npm 安装需要互联网。
+
+## 设置背景
+
+在主页点击明暗主题切换按钮旁边的齿轮图标。选择 `添加背景` 或 `更改背景`，然后选择图片。选择 `关闭背景` 可恢复默认背景。设置会保存到本地 `config.json`，并在每次启动时检查。为避免图片变形，请使用与屏幕宽高比相同的背景图片。
 
 ## 致谢
 

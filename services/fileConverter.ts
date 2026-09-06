@@ -3,13 +3,6 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { jsPDF } from 'jspdf';
 import ImageTracer from 'imagetracerjs';
-import libheifFactory from 'libheif-js/libheif-wasm/libheif-bundle.mjs';
-
-let libheif: any;
-const getLibheif = async () => {
-    if (!libheif) libheif = await libheifFactory();
-    return libheif;
-};
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const arr = dataUrl.split(',');
@@ -61,11 +54,33 @@ export const convertPdfToText = async (
     return new Blob([fullText], { type: 'text/plain' });
 };
 
+export const convertAudioToText = async (
+    file: File,
+    onProgress: (progress: number) => void,
+    targetFormat: ConversionTarget.TXT | ConversionTarget.SRT
+): Promise<Blob> => {
+    const electronApi = (window as any).electronAPI;
+    if (electronApi?.transcribeAudio) {
+        const fileData = await readFileAsArrayBuffer(file, onProgress);
+        const removeProgressListener = electronApi.onTranscriptionProgress?.((progress: number) => {
+            onProgress(10 + Math.round(Math.max(0, Math.min(100, progress)) * 0.9));
+        });
+        try {
+            const transcript = await electronApi.transcribeAudio(fileData, file.name, targetFormat);
+            onProgress(100);
+            return new Blob([transcript], { type: 'text/plain; charset=utf-8' });
+        } finally {
+            removeProgressListener?.();
+        }
+    }
+
+    throw new Error('Whisper.cpp transcription engine is not available in the current app build.');
+};
+
 export const convertImage = (
     file: File, 
     targetFormat: ConversionTarget.JPG | ConversionTarget.PNG | ConversionTarget.WEBP | ConversionTarget.HEIC | ConversionTarget.AVIF | ConversionTarget.PDF | ConversionTarget.ICO | ConversionTarget.SVG, 
-    onReadProgress: (progress: number) => void,
-    targetDimensions?: { width: number; height: number; }
+    onReadProgress: (progress: number) => void
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     // Use createObjectURL instead of FileReader for massive memory savings
@@ -91,22 +106,9 @@ export const convertImage = (
             return reject(new Error('Could not get canvas context'));
           }
 
-          if (targetDimensions) {
-              canvas.width = targetDimensions.width;
-              canvas.height = targetDimensions.height;
-              const hRatio = canvas.width / img.width;
-              const vRatio = canvas.height / img.height;
-              const ratio = Math.min(hRatio, vRatio);
-              const centerShift_x = (canvas.width - img.width * ratio) / 2;
-              const centerShift_y = (canvas.height - img.height * ratio) / 2;
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, img.width, img.height,
-                            centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
-          } else {
-              canvas.width = img.width;
-              canvas.height = img.height;
-              ctx.drawImage(img, 0, 0);
-          }
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
 
           // Free memory immediately after drawing to canvas
           URL.revokeObjectURL(imageUrl);
@@ -174,24 +176,6 @@ export const convertImage = (
               return;
           }
           
-          if (targetFormat === ConversionTarget.HEIC || targetFormat === ConversionTarget.AVIF) {
-              const heif = await getLibheif();
-              if (!heif.Encoder) return reject(new Error('HEIF/AVIF library not loaded.'));
-              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              const format = targetFormat === ConversionTarget.HEIC ? heif.Image.Format.HEVC : heif.Image.Format.AVIS;
-              const encoder = new heif.Encoder(format);
-              const { heif: heifFile } = await encoder.encode(
-                  [{
-                      width: canvas.width,
-                      height: canvas.height,
-                      data: imageData.data
-                  }], { quality: 90 }
-              );
-              const mimeType = targetFormat === ConversionTarget.HEIC ? 'image/heic' : 'image/avif';
-              resolve(new Blob([heifFile as ArrayBuffer], { type: mimeType }));
-              return;
-          }
-          
           let mimeType: string;
           switch (targetFormat) {
             case ConversionTarget.JPG: mimeType = 'image/jpeg'; break;
@@ -237,18 +221,27 @@ const readFileAsArrayBuffer = async (file: File, onProgress: (progress: number) 
 export const convertMedia = async (
     ffmpeg: any, 
     file: File, 
-    targetFormat: ConversionTarget.MP4 | ConversionTarget.WEBM | ConversionTarget.WMV | ConversionTarget.MKV | ConversionTarget.MP3 | ConversionTarget.WAV | ConversionTarget.FLAC | ConversionTarget.OGG, 
-    onConvertProgress: (progress: number) => void, 
+    targetFormat: ConversionTarget.JPG | ConversionTarget.PNG | ConversionTarget.WEBP | ConversionTarget.HEIC | ConversionTarget.AVIF | ConversionTarget.MP4 | ConversionTarget.WEBM | ConversionTarget.WMV | ConversionTarget.MKV | ConversionTarget.MP3 | ConversionTarget.WAV | ConversionTarget.FLAC | ConversionTarget.OGG, 
+    onConvertProgress: (progress: number, etaSeconds?: number | null) => void, 
     onReadProgress: (progress: number) => void,
-    targetDimensions?: { width: number; height: number; }
+    inputPath?: string
 ): Promise<Blob> => {
         const electronApi = (window as any).electronAPI;
         if (electronApi?.convertMedia) {
-            const fileData = await readFileAsArrayBuffer(file, onReadProgress);
+            const filePath = inputPath || electronApi.getFilePath?.(file);
+            const fileData = filePath ? filePath : await readFileAsArrayBuffer(file, onReadProgress);
+            onReadProgress(100);
             onConvertProgress(10);
-            const nativeData = await electronApi.convertMedia(fileData, file.name, targetFormat, targetDimensions);
-            onConvertProgress(100);
-            return new Blob([nativeData], { type: getMediaMimeType(targetFormat) });
+                        const removeProgressListener = electronApi.onMediaProgress?.((update: { fileName: string; progress: number; etaSeconds?: number | null }) => {
+                                if (update.fileName === file.name) onConvertProgress(update.progress, update.etaSeconds);
+                        });
+                        try {
+                            const nativeData = await electronApi.convertMedia(fileData, file.name, targetFormat);
+                            onConvertProgress(100, 0);
+                            return new Blob([nativeData], { type: getMediaMimeType(targetFormat) });
+                        } finally {
+                            removeProgressListener?.();
+                        }
         }
 
     if (!ffmpeg) {
@@ -273,9 +266,6 @@ export const convertMedia = async (
     await ffmpeg.writeFile(inputFileName, new Uint8Array(fileData));
     
     const command = ['-i', inputFileName];
-    if (targetDimensions) {
-        command.push('-vf', `scale=w=${targetDimensions.width}:h=${targetDimensions.height}:force_original_aspect_ratio=decrease,pad=${targetDimensions.width}:${targetDimensions.height}:-1:-1:color=black`);
-    }
     command.push(outputFileName);
 
     await ffmpeg.exec(command);
@@ -305,6 +295,11 @@ function getMediaMimeType(targetFormat: ConversionTarget): string {
         case ConversionTarget.WAV: mimeType = 'audio/wav'; break;
         case ConversionTarget.FLAC: mimeType = 'audio/flac'; break;
         case ConversionTarget.OGG: mimeType = 'audio/ogg'; break;
+        case ConversionTarget.JPG: mimeType = 'image/jpeg'; break;
+        case ConversionTarget.PNG: mimeType = 'image/png'; break;
+        case ConversionTarget.WEBP: mimeType = 'image/webp'; break;
+        case ConversionTarget.HEIC: mimeType = 'image/heic'; break;
+        case ConversionTarget.AVIF: mimeType = 'image/avif'; break;
         default: mimeType = 'application/octet-stream';
     }
     return mimeType;
