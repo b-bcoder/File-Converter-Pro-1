@@ -1,6 +1,6 @@
 # File Converter Pro (FCP)
 
-File Converter Pro is a Windows desktop application for converting image, video, audio and PDF files locally on your device. The app runs fully offline and does not upload files to an online service.
+File Converter Pro is a Windows desktop application for converting image, video, audio and PDF files locally on your device. Conversion and transcription run locally and do not upload your files to an online service. Internet access is only used for the optional GitHub update check.
 
 ## Overview
 
@@ -67,15 +67,21 @@ npm run dist
 
 > Note: the generated installer is large and is intended for local use or distribution outside GitHub, not for uploading to GitHub because of the file size limit.
 
-The current Windows installer is `release/File Converter Pro Setup 1.0.2.exe`. It includes Whisper, its runtime files and the base English model, so end users do not need MSYS2, a separate Whisper installation or internet access for transcription.
+The current Windows installer is `release/File Converter Pro Setup 1.0.3.exe`. It includes Whisper, its runtime files and the base English model, so end users do not need MSYS2, a separate Whisper installation or internet access for transcription.
 
 ## Usage
 
 - Start the app from the desktop shortcut or installed executable.
 - Select the source files or folders.
 - Choose the desired output format.
-- Configure optional settings such as resolution or ZIP output.
-- Start the conversion and save the results to your destination folder.
+- Optionally choose an output folder in Settings.
+- Start the conversion and monitor the per-file progress and estimated remaining time.
+- Download individual results or package successful results in a ZIP archive.
+- Retry individual failed conversions or all failed conversions.
+
+The optional source-file deletion setting is disabled by default. When enabled, files are first copied to temporary local storage and are deleted from their original location only after the converted output has been written successfully. This action cannot be undone and requires confirmation before each conversion run.
+
+The app checks the [GitHub Releases](https://github.com/uihorsewolf-design/File-Converter-Pro-1/releases) page for a newer Windows installer when an internet connection is available. Updates are never downloaded or installed without user confirmation.
 
 For audio transcription, add an audio file, choose `TXT` or `SRT`, and select `Convert All`. WAV input is automatically normalized before Whisper processes it.
 
@@ -91,7 +97,6 @@ For audio transcription, add an audio file, choose `TXT` or `SRT`, and select `C
 ├── vite.config.ts
 ├── metadata.json
 ├── i18n.ts
-├── resolutions.ts
 ├── types.ts
 ├── preload.js
 ├── electron-main.cjs
