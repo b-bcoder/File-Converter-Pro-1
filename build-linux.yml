@@ -1,0 +1,53 @@
+name: Build Linux packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux Whisper runtime
+        shell: bash
+        run: |
+          whisper_dir="node_modules/whisper-node/lib/whisper.cpp"
+          cmake -S "$whisper_dir" -B "$whisper_dir/build" \
+            -DWHISPER_BUILD_TESTS=OFF \
+            -DWHISPER_BUILD_EXAMPLES=ON \
+            -DWHISPER_BUILD_SHARED_LIBS=OFF
+          cmake --build "$whisper_dir/build" --config Release --parallel
+          bash "$whisper_dir/models/download-ggml-model.sh" base.en
+          whisper_binary=$(find "$whisper_dir/build" -type f \( -name whisper-cli -o -name main \) -perm -111 | head -n 1)
+          test -n "$whisper_binary"
+          test -f "$whisper_dir/models/ggml-base.en.bin"
+          rm -f whisper-runtime/*
+          cp "$whisper_binary" whisper-runtime/whisper-cli
+          cp "$whisper_dir/models/ggml-base.en.bin" whisper-runtime/ggml-base.en.bin
+          chmod +x whisper-runtime/whisper-cli
+
+      - name: Build AppImage and Debian package
+        run: npm run dist:linux
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-converter-pro-linux
+          path: |
+            release/*.AppImage
+            release/*.deb
